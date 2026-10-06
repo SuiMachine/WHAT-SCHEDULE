@@ -53,6 +53,7 @@ The following are **strictly prohibited**:
 - Do not submit AI-generated code that you do not understand and cannot explain.
 - Do not use AI to generate commit messages, changelogs, or release notes that misrepresent the nature of a change.
 - Do not use AI to automate commits, reviews, or merges without explicit human involvement and oversight.
+- Readme and documentation has to be written by hand.
 
 ---
 

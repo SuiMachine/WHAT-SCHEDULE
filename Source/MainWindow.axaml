@@ -1,25 +1,27 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:WhatSchedule.ViewModels"
+        xmlns:controls="clr-namespace:WhatSchedule.Controls"
+        xmlns:app="clr-namespace:WhatSchedule"
         x:Class="WhatSchedule.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="WHAT SCHEDULE?!"
         Width="1920" Height="1080"
         WindowStartupLocation="CenterScreen">
 
-  <Design.DataContext>
-    <vm:MainWindowViewModel />
-  </Design.DataContext>
+	<Design.DataContext>
+		<vm:MainWindowViewModel />
+	</Design.DataContext>
 
-  <Grid RowDefinitions="Auto,Auto,*" Margin="16" Background="#F0F0F0">
-    <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,12">
-      <Button Grid.Column="0" Content="Load..." />
-      <Button Grid.Column="1" Content="Save..." Margin="8,0,0,0" />
-    </Grid>
+	<Grid RowDefinitions="Auto,Auto,*" Margin="4" Background="{x:Static app:ThemeDefinition.Background}">
+		<Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" Margin="0,0,0,12">
+			<Button Grid.Column="0" Content="Load..." />
+			<Button Grid.Column="1" Content="Save..." Margin="8,0,0,0" />
+		</Grid>
 
-    <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Background="#F0F0F0">
-      <Image Source="{Binding Preview}" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center" />
-    </Border>
-  </Grid>
+		<Border Grid.Row="2" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
+			<controls:PreviewCanvas Image="{Binding Preview}" />
+		</Border>
+	</Grid>
 
 </Window>

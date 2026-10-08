@@ -7,3 +7,7 @@ This application targets Windows and Linux.
 
 - [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)
 - On Linux, text rendering requires fontconfig and at least one installed font:
+
+## Libraries used
+- [Avalonia (UI)](https://github.com/avaloniaui/avalonia)
+- [SkiaSharp](https://github.com/mono/skiasharp)

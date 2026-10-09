@@ -22,5 +22,6 @@ public sealed record TextOverlayOptions
 
 	public SKPoint ShadowOffset { get; init; } = new(3, 3);
 
+	/// <summary>Top-left corner of the text block, in image/document pixels.</summary>
 	public SKPoint Position { get; init; } = new(20, 20);
 }

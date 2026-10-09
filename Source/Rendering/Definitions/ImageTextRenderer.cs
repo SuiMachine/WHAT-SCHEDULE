@@ -3,10 +3,44 @@ using SkiaSharp;
 namespace WhatSchedule.Rendering.Definitions;
 
 /// <summary>
-/// Renders styled text overlays (fill, outline, shadow) onto images using SkiaSharp.
+/// Renders styled text overlays (fill, outline, shadow) using SkiaSharp.
 /// </summary>
 public static class ImageTextRenderer
 {
+	private static readonly Dictionary<string, SKTypeface> TypefaceCache = new(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>
+	/// Measures the bounding box of the text described by <paramref name="options"/>,
+	/// ignoring its position. The height covers the font's ascent and descent.
+	/// </summary>
+	public static SKSize Measure(TextOverlayOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(options);
+
+		using var font = CreateFont(options);
+		var width = MeasureWidth(font, options.Text);
+		var metrics = font.Metrics;
+		return new SKSize(width, -metrics.Ascent + metrics.Descent);
+	}
+
+	/// <summary>
+	/// Draws the styled text described by <paramref name="options"/> onto
+	/// <paramref name="canvas"/>. <see cref="TextOverlayOptions.Position"/> is
+	/// the top-left corner of the text block.
+	/// </summary>
+	public static void Draw(SKCanvas canvas, TextOverlayOptions options)
+	{
+		ArgumentNullException.ThrowIfNull(canvas);
+		ArgumentNullException.ThrowIfNull(options);
+
+		using var font = CreateFont(options);
+		var baseline = new SKPoint(options.Position.X, options.Position.Y - font.Metrics.Ascent);
+
+		DrawShadow(canvas, options, font, baseline);
+		DrawOutline(canvas, options, font, baseline);
+		DrawFill(canvas, options, font, baseline);
+	}
+
 	/// <summary>
 	/// Draws the text described by <paramref name="options"/> onto a copy of
 	/// <paramref name="source"/>. The source bitmap is never modified.
@@ -25,24 +59,34 @@ public static class ImageTextRenderer
 		using (var canvas = new SKCanvas(result))
 		{
 			canvas.DrawBitmap(source, 0, 0);
-
-			using var typeface = SKTypeface.FromFamilyName(options.FontFamily) is { } queried
-				? queried
-				: null;
-			using var font = new SKFont(typeface ?? SKTypeface.Default, options.FontSize)
-			{
-				Edging = SKFontEdging.Antialias,
-			};
-
-			DrawShadow(canvas, options, font);
-			DrawOutline(canvas, options, font);
-			DrawFill(canvas, options, font);
+			Draw(canvas, options);
 		}
 
 		return result;
 	}
 
-	private static void DrawShadow(SKCanvas canvas, TextOverlayOptions options, SKFont font)
+	private static SKFont CreateFont(TextOverlayOptions options)
+	{
+		if (!TypefaceCache.TryGetValue(options.FontFamily, out var typeface))
+		{
+			typeface = SKTypeface.FromFamilyName(options.FontFamily) ?? SKTypeface.Default;
+			TypefaceCache[options.FontFamily] = typeface;
+		}
+
+		return new SKFont(typeface, options.FontSize)
+		{
+			Edging = SKFontEdging.Antialias,
+		};
+	}
+
+	private static float MeasureWidth(SKFont font, string text)
+	{
+		var glyphs = new ushort[font.CountGlyphs(text)];
+		font.GetGlyphs(text, glyphs);
+		return font.MeasureText(glyphs, null);
+	}
+
+	private static void DrawShadow(SKCanvas canvas, TextOverlayOptions options, SKFont font, SKPoint baseline)
 	{
 		if (options.ShadowColor.Alpha == 0)
 		{
@@ -57,13 +101,13 @@ public static class ImageTextRenderer
 		};
 		canvas.DrawText(
 			options.Text,
-			options.Position.X + options.ShadowOffset.X,
-			options.Position.Y + options.ShadowOffset.Y,
+			baseline.X + options.ShadowOffset.X,
+			baseline.Y + options.ShadowOffset.Y,
 			font,
 			paint);
 	}
 
-	private static void DrawOutline(SKCanvas canvas, TextOverlayOptions options, SKFont font)
+	private static void DrawOutline(SKCanvas canvas, TextOverlayOptions options, SKFont font, SKPoint baseline)
 	{
 		if (options.OutlineWidth <= 0)
 		{
@@ -79,16 +123,16 @@ public static class ImageTextRenderer
 			StrokeJoin = SKStrokeJoin.Round,
 			StrokeCap = SKStrokeCap.Round,
 		};
-		canvas.DrawText(options.Text, options.Position.X, options.Position.Y, font, paint);
+		canvas.DrawText(options.Text, baseline.X, baseline.Y, font, paint);
 	}
 
-	private static void DrawFill(SKCanvas canvas, TextOverlayOptions options, SKFont font)
+	private static void DrawFill(SKCanvas canvas, TextOverlayOptions options, SKFont font, SKPoint baseline)
 	{
 		using var paint = new SKPaint
 		{
 			Color = options.TextColor,
 			IsAntialias = true,
 		};
-		canvas.DrawText(options.Text, options.Position.X, options.Position.Y, font, paint);
+		canvas.DrawText(options.Text, baseline.X, baseline.Y, font, paint);
 	}
 }

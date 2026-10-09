@@ -1,9 +1,10 @@
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SkiaSharp;
-using WhatSchedule.Rendering.Definitions;
+using WhatSchedule.Documents;
+using WhatSchedule.Elements;
+using WhatSchedule.Rendering;
 
 namespace WhatSchedule.ViewModels;
 
@@ -11,36 +12,62 @@ public partial class MainWindowViewModel : ObservableObject
 {
 	private string overlayText = "WHAT SCHEDULE";
 
-	[ObservableProperty]
-	private IImage? preview;
-
 	public string OverlayText
 	{
 		get => overlayText;
 		set => SetProperty(ref overlayText, value);
 	}
 
-	[RelayCommand]
-	public void RenderPreview()
-	{
-		using var source = CreateSampleImage();
-		using var rendered = ImageTextRenderer.Apply(source, new TextOverlayOptions
-		{
-			Text = OverlayText,
-			FontSize = 56,
-			TextColor = SKColors.White,
-			OutlineColor = SKColors.Black,
-			OutlineWidth = 3,
-			ShadowColor = SKColors.Black.WithAlpha(160),
-			ShadowBlur = 8,
-			ShadowOffset = new SKPoint(4, 4),
-			Position = new SKPoint(24, 72),
-		});
+	/// <summary>The document being edited; the canvas renders and modifies this.</summary>
+	public Document Document { get; }
 
-		Preview = ToAvaloniaBitmap(rendered);
+	/// <summary>Set by the main window so commands can open file pickers.</summary>
+	public IStorageProvider? StorageProvider { get; set; }
+
+	public MainWindowViewModel()
+	{
+		Document = CreateSampleDocument();
 	}
 
-	private static SKBitmap CreateSampleImage()
+	[RelayCommand]
+	private async Task ExportAsync()
+	{
+		var provider = StorageProvider;
+		if (provider is null)
+			return;
+
+		var file = await provider.SaveFilePickerAsync(new FilePickerSaveOptions
+		{
+			Title = "Export PNG",
+			SuggestedFileName = "schedule",
+			DefaultExtension = "png",
+			FileTypeChoices = [new FilePickerFileType("PNG image") { Patterns = ["*.png"] }],
+		});
+		if (file is null)
+			return;
+
+		var png = DocumentRenderer.EncodePng(Document);
+		await using var stream = await file.OpenWriteAsync();
+		await stream.WriteAsync(png);
+	}
+
+	private Document CreateSampleDocument()
+	{
+		var document = new Document { Background = CreateSampleBackground() };
+		document.Add(new LabelElement
+		{
+			Text = OverlayText,
+			FontSize = 56f,
+			OutlineWidth = 3f,
+			ShadowColor = SKColors.Black.WithAlpha(160),
+			ShadowBlur = 8f,
+			ShadowOffset = new SKPoint(4f, 4f),
+			Position = new SKPoint(24f, 24f),
+		});
+		return document;
+	}
+
+	private static SKBitmap CreateSampleBackground()
 	{
 		const int width = 1920;
 		const int height = 1080;
@@ -58,13 +85,5 @@ public partial class MainWindowViewModel : ObservableObject
 		};
 		canvas.DrawRect(0, 0, width, height, paint);
 		return bitmap;
-	}
-
-	private static Bitmap ToAvaloniaBitmap(SKBitmap source)
-	{
-		using var image = SKImage.FromBitmap(source);
-		using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-		var stream = new MemoryStream(data.ToArray());
-		return new Bitmap(stream);
 	}
 }

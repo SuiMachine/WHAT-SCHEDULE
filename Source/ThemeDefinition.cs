@@ -10,9 +10,12 @@ public static class ThemeDefinition
 	public static readonly ISolidColorBrush RulerBackground = new ImmutableSolidColorBrush(0xFFE4E4E4);
 	public static readonly ISolidColorBrush RulerTick = new ImmutableSolidColorBrush(0xFF666666);
 	public static readonly ISolidColorBrush RulerLabel = new ImmutableSolidColorBrush(0xFF333333);
+	public static readonly ISolidColorBrush Selection = new ImmutableSolidColorBrush(0xFF0078D7);
+	public static readonly ISolidColorBrush HandleFill = new ImmutableSolidColorBrush(Colors.White);
 
 	public static readonly IPen RulerBorderPen = new Pen(ThemeDefinition.Border, 1);
 	public static readonly IPen TickPen = new Pen(ThemeDefinition.RulerTick, 1);
+	public static readonly IPen SelectionPen = new Pen(ThemeDefinition.Selection, 1);
 	public static readonly Typeface LabelTypeface = Typeface.Default;
 
 	public const double RulerThickness = 22;
@@ -22,4 +25,8 @@ public static class ThemeDefinition
 	public const double MinVisibleEdge = 40;
 	public const double MinMajorTickSpacing = 60;
 	public const double LabelFontSize = 10;
+	public const double HandleSize = 8;
+	public const double HandleHitRadius = 6;
+	public const double MinElementSize = 8;
+	public const float MinFontSize = 4;
 }

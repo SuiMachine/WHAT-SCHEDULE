@@ -1,3 +1,4 @@
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -27,6 +28,30 @@ public partial class MainWindowViewModel : ObservableObject
 	public MainWindowViewModel()
 	{
 		Document = CreateSampleDocument();
+	}
+
+	[RelayCommand]
+	private async Task NewScheduleAsync()
+	{
+		var provider = StorageProvider;
+		if (provider is null)
+			return;
+
+		IReadOnlyList<IStorageFile>? file = await provider.OpenFilePickerAsync(new FilePickerOpenOptions
+		{
+			Title = "Open background image",
+			AllowMultiple = false,
+			FileTypeFilter = [new FilePickerFileType("Image files") { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.bmp"] }],
+		});
+
+		if (file is null || file.Count == 0 || file[0] is null)
+			return;
+
+		var bitmap = SKBitmap.Decode(await file[0].OpenReadAsync());
+		if(bitmap is null)
+			return;
+
+		Document.PrepareNewWithBackground(bitmap);
 	}
 
 	[RelayCommand]

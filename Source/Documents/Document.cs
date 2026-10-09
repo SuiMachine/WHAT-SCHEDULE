@@ -29,4 +29,11 @@ public sealed class Document
 	}
 
 	public void RaiseChanged() => Changed?.Invoke();
+
+	internal void PrepareNewWithBackground(SKBitmap bitmap)
+	{
+		this.Background = bitmap;
+		elements.Clear();
+		RaiseChanged();
+	}
 }

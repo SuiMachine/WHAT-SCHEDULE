@@ -29,7 +29,7 @@ public static class ThemeDefinition
 	public const double LabelFontSize = 10;
 	public const double HandleSize = 8;
 	public const double HandleHitRadius = 6;
-	public const double GuideHitTolerance = 6;
+	public const double GuideHitTolerance = 2;
 	public const double MinElementSize = 8;
 	public const float MinFontSize = 4;
 }

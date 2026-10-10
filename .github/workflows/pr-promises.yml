@@ -1,0 +1,56 @@
+# Fails (and blocks merging via a required status check) unless both promises
+# from the PR template are present in the PR description and checked.
+# Deleting or rewording a promise to evade the checkbox also fails the check.
+name: PR promises
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-promises:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body ?? '';
+            const lines = body.split(/\r?\n/);
+
+            //Each promise is identified by a fragment of its wording, so it
+            //cannot be silently deleted or reworded to evade the checkbox.
+            const promises = [
+              {
+                fragment: /understand the code i am trying to merge/i,
+                label: 'I understand the code I am trying to merge',
+              },
+              {
+                fragment: /created by me and not/i,
+                label: 'The description and merge request were created by me and not by AI',
+              },
+            ];
+
+            //A GitHub task-list checkbox line: "- [ ] text" / "- [x] text".
+            //Accepts "*" or "-" as the list marker and any of "x", "X" as checked.
+            const taskLine = /^(\s*)[-*]\s+\[([ xX])\]\s*/;
+
+            for (const promise of promises) {
+              const boxes = lines
+                .filter(line => promise.fragment.test(line))
+                .map(line => line.match(taskLine))
+                .filter(Boolean);
+
+              const checked = boxes.some(m => m[2] !== ' ');
+              const unchecked = boxes.some(m => m[2] === ' ');
+
+              if (unchecked || !checked) {
+                core.setFailed(
+                  `Required promise is missing or unchecked: "${promise.label}". ` +
+                  'Both promises from the PR template must be present in the description ' +
+                  'and have their checkboxes ticked (see AI_POLICY.md).'
+                );
+              }
+            }

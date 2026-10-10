@@ -33,6 +33,15 @@ public abstract class CanvasElement
 	/// <summary>Captures the element's current state to pass to <see cref="ScaleTo"/> during a scale drag.</summary>
 	public abstract ScaleState BeginScale();
 
+	/// <summary>An immutable snapshot of an element's mutable state, captured by <see cref="CaptureState"/>.</summary>
+	public abstract record ElementState;
+
+	/// <summary>Captures the element's current state so <see cref="RestoreState"/> can put it back later (undo/redo).</summary>
+	public abstract ElementState CaptureState();
+
+	/// <summary>Restores a state previously captured by <see cref="CaptureState"/>.</summary>
+	public abstract void RestoreState(ElementState state);
+
 	/// <summary>
 	/// Resizes the element so that <paramref name="anchor"/>, the corner opposite the grabbed
 	/// handle, stays fixed while the drag cursor is at <paramref name="cursor"/>. Both points

@@ -53,7 +53,27 @@ public sealed class LabelElement : CanvasElement
 			anchor.Y <= cursor.Y ? anchor.Y : anchor.Y - size.Height);
 	}
 
+	public override ElementState CaptureState() => new LabelElementState(Position, Text, FontSize, TextColor, OutlineColor, OutlineWidth, ShadowColor, ShadowBlur, ShadowOffset);
+
+	public override void RestoreState(ElementState state)
+	{
+		if (state is not LabelElementState snapshot)
+			return;
+
+		Position = snapshot.Position;
+		Text = snapshot.Text;
+		FontSize = snapshot.FontSize;
+		TextColor = snapshot.TextColor;
+		OutlineColor = snapshot.OutlineColor;
+		OutlineWidth = snapshot.OutlineWidth;
+		ShadowColor = snapshot.ShadowColor;
+		ShadowBlur = snapshot.ShadowBlur;
+		ShadowOffset = snapshot.ShadowOffset;
+	}
+
 	private sealed record LabelScaleState(float Width, float FontSize, float OutlineWidth, float ShadowBlur, SKPoint ShadowOffset) : ScaleState;
+
+	public sealed record LabelElementState(SKPoint Position, string Text, float FontSize, SKColor TextColor, SKColor OutlineColor, float OutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset) : ElementState;
 
 	private TextOverlayOptions BuildOptions(SKPoint position) => new()
 	{

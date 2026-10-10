@@ -44,12 +44,47 @@ public class PreviewCanvas : Control, IDisposable
 
 	public PreviewCanvas()
 	{
+		Focusable = true;
 		Menus = new CanvasMenus(this);
 		PointerCaptureLost += (_, _) =>
 		{
 			activeDrag = null;
 			Cursor = Cursor.Default;
 		};
+	}
+
+	protected override void OnKeyDown(KeyEventArgs e)
+	{
+		base.OnKeyDown(e);
+
+		var document = Document;
+		if (document is null)
+			return;
+
+		if (e.Key == Key.Delete)
+		{
+			if (Selection.SelectedElement is { } element && document.RemoveTracked(element))
+				e.Handled = true;
+			return;
+		}
+
+		if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
+			return;
+
+		if (e.Key == Key.Z)
+		{
+			//Ctrl+Shift+Z redoes, like Ctrl+Y does.
+			if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+				document.History.Redo(document);
+			else
+				document.History.Undo(document);
+			e.Handled = true;
+		}
+		else if (e.Key == Key.Y)
+		{
+			document.History.Redo(document);
+			e.Handled = true;
+		}
 	}
 
 	protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -91,6 +126,9 @@ public class PreviewCanvas : Control, IDisposable
 	protected override void OnPointerPressed(PointerPressedEventArgs e)
 	{
 		base.OnPointerPressed(e);
+
+		//The canvas needs keyboard focus for the Delete key to work.
+		Focus();
 
 		var point = e.GetCurrentPoint(this);
 		if (point.Properties.IsRightButtonPressed)

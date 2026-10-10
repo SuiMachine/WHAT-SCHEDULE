@@ -63,6 +63,7 @@ internal sealed class ElementMoveDrag : IPointerDrag
 	private readonly CanvasElement element;
 	private readonly Point startPosition;
 	private readonly SKPoint elementStartPosition;
+	private readonly CanvasElement.ElementState startState;
 
 	public ElementMoveDrag(PreviewCanvas canvas, CanvasElement element, Point position)
 	{
@@ -70,6 +71,7 @@ internal sealed class ElementMoveDrag : IPointerDrag
 		this.element = element;
 		startPosition = position;
 		elementStartPosition = element.Position;
+		startState = element.CaptureState();
 	}
 
 	public Cursor Cursor => CanvasCursors.Move;
@@ -89,6 +91,7 @@ internal sealed class ElementMoveDrag : IPointerDrag
 
 	public void Release(Point position)
 	{
+		canvas.Document?.RecordStateChange(element, startState);
 	}
 }
 
@@ -98,6 +101,7 @@ internal sealed class ElementScaleDrag : IPointerDrag
 	private readonly Corner corner;
 	private readonly SKPoint anchor;
 	private readonly CanvasElement.ScaleState start;
+	private readonly CanvasElement.ElementState startState;
 
 	public ElementScaleDrag(PreviewCanvas canvas, Corner corner)
 	{
@@ -106,6 +110,7 @@ internal sealed class ElementScaleDrag : IPointerDrag
 		var element = canvas.Selection.SelectedElement!;
 		anchor = SelectionLayer.GetAnchor(element.Bounds, corner);
 		start = element.BeginScale();
+		startState = element.CaptureState();
 	}
 
 	public Cursor Cursor => CanvasCursors.ForCorner(corner);
@@ -123,6 +128,8 @@ internal sealed class ElementScaleDrag : IPointerDrag
 
 	public void Release(Point position)
 	{
+		if (canvas.Selection.SelectedElement is { } element)
+			canvas.Document?.RecordStateChange(element, startState);
 	}
 }
 

@@ -119,8 +119,9 @@ internal sealed class CanvasMenus
 			return;
 
 		var element = new LabelElement { Text = text.Trim(), Position = position };
-		document.Add(element);
+		document.AddTracked(element);
 		canvas.Selection.SelectedElement = element;
+		canvas.Focus();
 		canvas.InvalidateVisual();
 	}
 
@@ -148,6 +149,6 @@ internal sealed class CanvasMenus
 		if (bitmap is null)
 			return;
 
-		document.Add(new ImageElement(bitmap, position));
+		document.AddTracked(new ImageElement(bitmap, position));
 	}
 }

@@ -56,6 +56,20 @@ namespace WhatSchedule.Elements
 
 		public override void Draw(SKCanvas canvas) => canvas.DrawBitmap(Bitmap, SKRect.Create(Position, Size), BitmapPaint);
 
+		public override ElementState CaptureState() => new ImageElementState(Position, Width, Height);
+
+		public override void RestoreState(ElementState state)
+		{
+			if (state is not ImageElementState snapshot)
+				return;
+
+			Position = snapshot.Position;
+			Width = snapshot.Width;
+			Height = snapshot.Height;
+		}
+
 		private sealed record ImageScaleState(float Width, float Height) : ScaleState;
+
+		public sealed record ImageElementState(SKPoint Position, float Width, float Height) : ElementState;
 	}
 }

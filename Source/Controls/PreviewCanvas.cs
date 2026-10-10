@@ -22,6 +22,7 @@ public class PreviewCanvas : Control, IDisposable
 		Pan,
 		MoveElement,
 		ScaleElement,
+		Guide,
 	}
 
 	private enum Corner
@@ -39,6 +40,8 @@ public class PreviewCanvas : Control, IDisposable
 	private static readonly Cursor TopRightCursor = new(StandardCursorType.TopRightCorner);
 	private static readonly Cursor BottomRightCursor = new(StandardCursorType.BottomRightCorner);
 	private static readonly Cursor BottomLeftCursor = new(StandardCursorType.BottomLeftCorner);
+	private static readonly Cursor HorizontalGuideCursor = new(StandardCursorType.SizeNorthSouth);
+	private static readonly Cursor VerticalGuideCursor = new(StandardCursorType.SizeWestEast);
 
 	private readonly FormattedTextCache labelCache = new();
 	private ContextMenu rulerContextMenu;
@@ -62,6 +65,8 @@ public class PreviewCanvas : Control, IDisposable
 	private SKPoint moveStartPosition;
 	private SKPoint scaleAnchor;
 	private CanvasElement.ScaleState? scaleStart;
+	private readonly List<GuideLine> guides = new();
+	private GuideLine? dragGuide;
 
 	private SKPoint contextMenuPosition;
 
@@ -78,6 +83,7 @@ public class PreviewCanvas : Control, IDisposable
 		PointerCaptureLost += (_, _) =>
 		{
 			dragMode = DragMode.None;
+			dragGuide = null;
 			Cursor = Cursor.Default;
 		};
 		rulerContextMenu = BuildRulerContextMenu();
@@ -100,6 +106,8 @@ public class PreviewCanvas : Control, IDisposable
 			previewDirty = true;
 			hasInitialFit = false;
 			selectedElement = null;
+			guides.Clear();
+			dragGuide = null;
 			dragMode = DragMode.None;
 			InvalidateVisual();
 		}
@@ -107,6 +115,11 @@ public class PreviewCanvas : Control, IDisposable
 
 	private void OnDocumentChanged()
 	{
+		//The document may have discarded the selected element (e.g. a new background), so drop the selection with it.
+		var document = Document;
+		if (selectedElement is not null && document is not null && !document.Elements.Contains(selectedElement))
+			selectedElement = null;
+
 		previewDirty = true;
 		InvalidateVisual();
 	}
@@ -146,6 +159,18 @@ public class PreviewCanvas : Control, IDisposable
 		{
 			BeginScale(corner);
 			e.Pointer.Capture(this);
+			e.Handled = true;
+			return;
+		}
+
+		GuideLine? draggedGuide = CreateGuideFromRuler(position) ?? HitTestGuide(position);
+		if (draggedGuide is not null)
+		{
+			dragGuide = draggedGuide;
+			dragMode = DragMode.Guide;
+			Cursor = draggedGuide.IsHorizontal ? HorizontalGuideCursor : VerticalGuideCursor;
+			e.Pointer.Capture(this);
+			InvalidateVisual();
 			e.Handled = true;
 			return;
 		}
@@ -198,6 +223,9 @@ public class PreviewCanvas : Control, IDisposable
 			case DragMode.ScaleElement:
 				ScaleElement(position, e);
 				return;
+			case DragMode.Guide:
+				MoveGuide(position);
+				return;
 		}
 	}
 
@@ -206,6 +234,8 @@ public class PreviewCanvas : Control, IDisposable
 		if (e.Properties.IsRightButtonPressed)
 			return;
 		base.OnPointerReleased(e);
+		if (dragMode == DragMode.Guide)
+			ReleaseGuide(e.GetPosition(this));
 		EndDrag(e.Pointer);
 		e.Handled = true;
 	}
@@ -216,6 +246,7 @@ public class PreviewCanvas : Control, IDisposable
 			return;
 
 		dragMode = DragMode.None;
+		dragGuide = null;
 		if (pointer.Captured == this)
 		{
 			pointer.Capture(null);
@@ -280,6 +311,10 @@ public class PreviewCanvas : Control, IDisposable
 		{
 			Cursor = GetCornerCursor(corner);
 		}
+		else if (HitTestGuide(position) is { } guide)
+		{
+			Cursor = guide.IsHorizontal ? HorizontalGuideCursor : VerticalGuideCursor;
+		}
 		else if (HitTestElement(position) is not null)
 		{
 			Cursor = MoveCursor;
@@ -324,6 +359,69 @@ public class PreviewCanvas : Control, IDisposable
 		}
 
 		return null;
+	}
+
+	private GuideLine? CreateGuideFromRuler(Point position)
+	{
+		var document = Document;
+		if (document is null || previewBitmap is null)
+			return null;
+
+		var onHorizontalRuler = position.X >= ThemeDefinition.RulerThickness && position.Y < ThemeDefinition.RulerThickness;
+		var onVerticalRuler = position.X < ThemeDefinition.RulerThickness && position.Y >= ThemeDefinition.RulerThickness;
+		if (!onHorizontalRuler && !onVerticalRuler)
+			return null;
+
+		var point = ScreenToDocument(position);
+		var guide = onHorizontalRuler
+			? new GuideLine(isHorizontal: true, Math.Clamp(point.Y, 0, document.Height))
+			: new GuideLine(isHorizontal: false, Math.Clamp(point.X, 0, document.Width));
+		guides.Add(guide);
+		return guide;
+	}
+
+	private GuideLine? HitTestGuide(Point position)
+	{
+		var document = Document;
+		if (document is null || previewBitmap is null)
+			return null;
+
+		var point = ScreenToDocument(position);
+		var tolerance = (float)(ThemeDefinition.GuideHitTolerance / scale);
+		for (var i = guides.Count - 1; i >= 0; i--)
+		{
+			var guide = guides[i];
+			if (guide.IsHorizontal ? Math.Abs(guide.Position - point.Y) <= tolerance : Math.Abs(guide.Position - point.X) <= tolerance)
+				return guide;
+		}
+
+		return null;
+	}
+
+	private void MoveGuide(Point position)
+	{
+		var document = Document;
+		if (dragGuide is not { } guide || document is null)
+			return;
+
+		var point = ScreenToDocument(position);
+		guide.Position = guide.IsHorizontal
+			? Math.Clamp(point.Y, 0, document.Height)
+			: Math.Clamp(point.X, 0, document.Width);
+		InvalidateVisual();
+	}
+
+	private void ReleaseGuide(Point position)
+	{
+		if (dragGuide is not { } guide)
+			return;
+
+		var onRuler = guide.IsHorizontal ? position.Y < ThemeDefinition.RulerThickness : position.X < ThemeDefinition.RulerThickness;
+		if (onRuler)
+		{
+			guides.Remove(guide);
+			InvalidateVisual();
+		}
 	}
 
 	private static SKPoint GetCorner(SKRect bounds, Corner corner) => corner switch
@@ -531,7 +629,30 @@ public class PreviewCanvas : Control, IDisposable
 		var imageRect = GetImageRect(document);
 		context.DrawImage(previewBitmap!, imageRect);
 		DrawSelection(context, imageRect);
+		DrawGuides(context, bounds, imageRect);
 		DrawRulers(context, bounds, imageRect, new Size(document.Width, document.Height));
+	}
+
+	private void DrawGuides(DrawingContext context, Rect bounds, Rect imageRect)
+	{
+		if (guides.Count == 0)
+			return;
+
+		var content = GetContentRect(bounds);
+		using var clipState = context.PushClip(content);
+		foreach (var guide in guides)
+		{
+			if (guide.IsHorizontal)
+			{
+				var y = imageRect.Y + guide.Position * scale;
+				context.DrawLine(ThemeDefinition.GuidePen, new Point(content.X, y), new Point(content.Right, y));
+			}
+			else
+			{
+				var x = imageRect.X + guide.Position * scale;
+				context.DrawLine(ThemeDefinition.GuidePen, new Point(x, content.Y), new Point(x, content.Bottom));
+			}
+		}
 	}
 
 	private void EnsurePreviewBitmap(Document document)
@@ -546,6 +667,8 @@ public class PreviewCanvas : Control, IDisposable
 				AlphaFormat.Premul);
 			hasInitialFit = false;
 			previewDirty = true;
+			guides.Clear();
+			dragGuide = null;
 		}
 
 		if (previewDirty)
@@ -648,13 +771,13 @@ public class PreviewCanvas : Control, IDisposable
 
 	private void DrawTicks(DrawingContext context, Rect strip, double imageStart, double imageSize, RulerUnit unit, bool horizontal)
 	{
-		var unitsPerPixel = unit == RulerUnit.Percent ? 100 / imageSize : 1;
-		var step = ChooseStep(ThemeDefinition.MinMajorTickSpacing * unitsPerPixel / scale);
+		double unitsPerPixel = unit == RulerUnit.Percent ? 100 / imageSize : 1;
+		double step = ChooseStep(ThemeDefinition.MinMajorTickSpacing * unitsPerPixel / scale);
 		if (unit == RulerUnit.Percent && step > 100)
 			step = 100;
 
-		var minorPixels = step / unitsPerPixel / 5;
-		var firstTick = (int)Math.Ceiling(Math.Max(0, ((horizontal ? strip.X : strip.Y) - imageStart) / scale) / minorPixels);
+		double minorPixels = step / unitsPerPixel / 5;
+		int firstTick = (int)Math.Ceiling(Math.Max(0, ((horizontal ? strip.X : strip.Y) - imageStart) / scale) / minorPixels);
 
 		using var clipState = context.PushClip(strip);
 		for (var tick = firstTick; ; tick++)
@@ -700,10 +823,12 @@ public class PreviewCanvas : Control, IDisposable
 
 	private static string FormatTickLabel(double value, RulerUnit unit)
 	{
-		if (unit == RulerUnit.Pixels)
-			return ((int)Math.Round(value)).ToString(CultureInfo.InvariantCulture);
-
-		return value.ToString("0.##", CultureInfo.InvariantCulture) + "%";
+		return unit switch
+		{
+			RulerUnit.Pixels => ((int)Math.Round(value)).ToString(CultureInfo.InvariantCulture),
+			RulerUnit.Percent => value.ToString("0.##", CultureInfo.InvariantCulture) + "%",
+			_ => throw new ArgumentOutOfRangeException(nameof(unit), unit, null),
+		};
 	}
 
 	private static double ChooseStep(double minUnits)
@@ -712,6 +837,18 @@ public class PreviewCanvas : Control, IDisposable
 		var fraction = minUnits / magnitude;
 		var coefficient = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
 		return coefficient * magnitude;
+	}
+
+	private sealed class GuideLine
+	{
+		public GuideLine(bool isHorizontal, float position)
+		{
+			IsHorizontal = isHorizontal;
+			Position = position;
+		}
+
+		public bool IsHorizontal { get; }
+		public float Position { get; set; }
 	}
 
 	private sealed class FormattedTextCache

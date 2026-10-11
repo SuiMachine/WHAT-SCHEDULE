@@ -100,5 +100,18 @@ namespace WhatSchedule.Elements
 		private sealed record ImageScaleState(float Width, float Height) : ScaleState;
 
 		public sealed record ImageElementState(SKPoint Position, float Width, float Height) : ElementState;
+
+		public sealed class ImageElementData : ElementData
+		{
+			public const string KindName = "Image";
+
+			public override string Kind => KindName;
+
+			public string? Png { get; set; }
+
+			public float? Width { get; set; }
+
+			public float? Height { get; set; }
+		}
 	}
 }

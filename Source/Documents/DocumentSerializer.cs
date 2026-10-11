@@ -1,5 +1,6 @@
 using System.Globalization;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SkiaSharp;
 using WhatSchedule.Elements;
 
@@ -15,7 +16,8 @@ namespace WhatSchedule.Documents
 		{
 			NullValueHandling = NullValueHandling.Ignore,
 			Culture = CultureInfo.InvariantCulture,
-			Formatting = Formatting.Indented
+			Formatting = Formatting.Indented,
+			Converters = { new ElementDataConverter() }
 		});
 
 		public static Document Load(Stream stream)
@@ -60,11 +62,10 @@ namespace WhatSchedule.Documents
 			return document;
 		}
 
-		private static ElementData ToData(CanvasElement element) => element switch
+		private static CanvasElement.ElementData ToData(CanvasElement element) => element switch
 		{
-			LabelElement label => new ElementData
+			LabelElement label => new LabelElement.LabelElementData
 			{
-				Kind = ElementData.LabelKind,
 				Position = ToData(label.Position),
 				Text = label.Text,
 				FontFamily = label.FontFamily,
@@ -74,50 +75,49 @@ namespace WhatSchedule.Documents
 				OutlineWidth = label.OutlineWidth,
 				ShadowColor = ToData(label.ShadowColor),
 				ShadowBlur = label.ShadowBlur,
-				ShadowOffset = ToData(label.ShadowOffset),
+				ShadowOffset = ToData(label.ShadowOffset)
 			},
-			ImageElement image => new ElementData
+			ImageElement image => new ImageElement.ImageElementData
 			{
-				Kind = ElementData.ImageKind,
 				Position = ToData(image.Position),
 				Png = EncodePng(image.Bitmap),
 				Width = image.Width,
-				Height = image.Height,
+				Height = image.Height
 			},
-			_ => throw new NotSupportedException($"Cannot save {element.GetType().Name} elements."),
+			_ => throw new NotSupportedException($"Cannot save {element.GetType().Name} elements.")
 		};
 
-		private static CanvasElement FromData(ElementData data)
+		private static CanvasElement FromData(CanvasElement.ElementData data)
 		{
 			if (data.Position is not { } position)
 				throw new JsonSerializationException("An element is missing its position.");
 
-			switch (data.Kind)
+			switch (data)
 			{
-				case ElementData.LabelKind:
+				case LabelElement.LabelElementData label:
 					return new LabelElement
 					{
 						Position = ToSKPoint(position),
-						FontFamily = data.FontFamily ?? "Arial",
-						Text = data.Text ?? "Label",
-						FontSize = data.FontSize ?? 48f,
-						TextColor = ToSKColor(data.TextColor, SKColors.White),
-						OutlineColor = ToSKColor(data.OutlineColor, SKColors.Black),
-						OutlineWidth = data.OutlineWidth ?? 2f,
-						ShadowColor = ToSKColor(data.ShadowColor, SKColors.Black.WithAlpha(140)),
-						ShadowBlur = data.ShadowBlur ?? 6f,
-						ShadowOffset = data.ShadowOffset is { } shadowOffset ? ToSKPoint(shadowOffset) : new SKPoint(3f, 3f)
+						Text = label.Text,
+						FontFamily = label.FontFamily,
+						FontSize = label.FontSize,
+						TextColor = ToSKColor(label.TextColor, SKColors.White),
+						OutlineColor = ToSKColor(label.OutlineColor, SKColors.Black),
+						OutlineWidth = label.OutlineWidth,
+						ShadowColor = ToSKColor(label.ShadowColor, SKColors.Black.WithAlpha(140)),
+						ShadowBlur = label.ShadowBlur,
+						ShadowOffset = label.ShadowOffset is { } shadowOffset ? ToSKPoint(shadowOffset) : new SKPoint(3f, 3f)
 					};
-				case ElementData.ImageKind:
+				case ImageElement.ImageElementData image:
 					{
-						var bitmap = data.Png is null ? null : SKBitmap.Decode(Convert.FromBase64String(data.Png));
+						var bitmap = image.Png is null ? null : SKBitmap.Decode(Convert.FromBase64String(image.Png));
 						if (bitmap is null)
 							throw new JsonSerializationException("An image element could not be decoded.");
 
 						return new ImageElement(bitmap, ToSKPoint(position))
 						{
-							Width = data.Width ?? bitmap.Width,
-							Height = data.Height ?? bitmap.Height,
+							Width = image.Width ?? bitmap.Width,
+							Height = image.Height ?? bitmap.Height
 						};
 					}
 				default:
@@ -135,9 +135,9 @@ namespace WhatSchedule.Documents
 			return Convert.ToBase64String(data.ToArray());
 		}
 
-		private static PointData ToData(SKPoint point) => new() { X = point.X, Y = point.Y };
+		private static CanvasElement.PointData ToData(SKPoint point) => new() { X = point.X, Y = point.Y };
 
-		private static SKPoint ToSKPoint(PointData point) => new(point.X, point.Y);
+		private static SKPoint ToSKPoint(CanvasElement.PointData point) => new(point.X, point.Y);
 
 		private static string ToData(SKColor color)
 		{
@@ -159,6 +159,35 @@ namespace WhatSchedule.Documents
 				(byte)(packed >> 8 & 0xFF),
 				(byte)(packed & 0xFF));
 		}
+
+		/// <summary>
+		/// Reads an element's JSON as the storage class its kind names; writing needs no custom
+		/// logic, because elements are serialized by their runtime type, kind included.
+		/// </summary>
+		private sealed class ElementDataConverter : JsonConverter
+		{
+			public override bool CanConvert(Type objectType) => objectType == typeof(CanvasElement.ElementData);
+
+			public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
+			{
+				var element = JObject.Load(reader);
+				var kind = element[nameof(CanvasElement.ElementData.Kind)]?.ToString();
+
+				CanvasElement.ElementData data = kind switch
+				{
+					LabelElement.LabelElementData.KindName => new LabelElement.LabelElementData(),
+					ImageElement.ImageElementData.KindName => new ImageElement.ImageElementData(),
+					_ => throw new JsonSerializationException($"Unknown element kind '{kind}'.")
+				};
+
+				using var elementReader = element.CreateReader();
+				serializer.Populate(elementReader, data);
+				return data;
+			}
+
+			public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer) =>
+				throw new NotSupportedException("The converter only reads; elements are written by their runtime type.");
+		}
 	}
 
 	public sealed class DocumentData
@@ -169,54 +198,6 @@ namespace WhatSchedule.Documents
 
 		public List<Guide> Guides { get; set; } = new();
 
-		public List<ElementData> Elements { get; set; } = new();
-	}
-
-	/// <summary>
-	/// JSON shape of a canvas element; <see cref="Kind"/> picks which of the
-	/// label or image fields apply.
-	/// </summary>
-	public sealed class ElementData
-	{
-		public const string LabelKind = "Label";
-		public const string ImageKind = "Image";
-
-		public string Kind { get; set; } = "";
-
-		public PointData? Position { get; set; }
-
-		public string? FontFamily { get; set; }
-		// Label
-		public string? Text { get; set; }
-
-		public float? FontSize { get; set; }
-
-		public string? TextColor { get; set; }
-
-		public string? OutlineColor { get; set; }
-
-		public float? OutlineWidth { get; set; }
-
-		public string? ShadowColor { get; set; }
-
-		public float? ShadowBlur { get; set; }
-
-		public PointData? ShadowOffset { get; set; }
-
-		// Image
-		/// <summary>The element's image as a base64-encoded PNG.</summary>
-		public string? Png { get; set; }
-
-		public float? Width { get; set; }
-
-		public float? Height { get; set; }
-	}
-
-	/// <summary>JSON shape of a document-pixel coordinate pair.</summary>
-	public sealed class PointData
-	{
-		public float X { get; set; }
-
-		public float Y { get; set; }
+		public List<CanvasElement.ElementData> Elements { get; set; } = new();
 	}
 }

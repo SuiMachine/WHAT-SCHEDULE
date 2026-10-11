@@ -54,4 +54,25 @@ public abstract class CanvasElement
 	/// size and aspect ratio for images. Position and layering rows are handled by the panel.
 	/// </summary>
 	public abstract void BuildInspectorRows(IInspectorBuilder builder);
+
+	/// <summary>
+	/// JSON shape of a canvas element saved in a document: <see cref="Kind"/> picks the concrete
+	/// storage class nested in the element subclasses when loading, and every shape carries the
+	/// element's position.
+	/// </summary>
+	public abstract class ElementData
+	{
+		/// <summary>The discriminator naming the element type this shape stores.</summary>
+		public abstract string Kind { get; }
+
+		public PointData? Position { get; set; }
+	}
+
+	/// <summary>JSON shape of a document-pixel coordinate pair.</summary>
+	public sealed class PointData
+	{
+		public float X { get; set; }
+
+		public float Y { get; set; }
+	}
 }

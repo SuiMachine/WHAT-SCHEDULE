@@ -112,4 +112,29 @@ public sealed class LabelElement : CanvasElement
 		ShadowOffset = ShadowOffset,
 		Position = position,
 	};
+
+	public sealed class LabelElementData : ElementData
+	{
+		public const string KindName = "Label";
+
+		public override string Kind => KindName;
+
+		public string Text { get; set; } = "Label";
+
+		public string FontFamily { get; set; } = "Arial";
+
+		public float FontSize { get; set; } = 48f;
+
+		public string? TextColor { get; set; }
+
+		public string? OutlineColor { get; set; }
+
+		public float OutlineWidth { get; set; } = 2f;
+
+		public string? ShadowColor { get; set; }
+
+		public float ShadowBlur { get; set; } = 6f;
+
+		public PointData? ShadowOffset { get; set; }
+	}
 }

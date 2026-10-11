@@ -1,16 +1,16 @@
+// If there is a class that has too many summeries - it's this one
+// But it is an abstract base class, so I am willing to accept it - Sui
 using Avalonia.Input;
 using SkiaSharp;
 
 namespace WhatSchedule.Elements;
 
 /// <summary>
-/// Base class for everything placed on the document canvas.
+/// Base class for everything rendered in the canvas
 /// </summary>
 public abstract class CanvasElement
 {
-	/// <summary>
-	/// The position of the element's top-left corner in document pixels.
-	/// </summary>
+	/// <summary>The position of the element's top-left corner in document pixels.</summary>
 	public SKPoint Position { get; set; }
 
 	/// <summary>Current size of the element's bounding box in document pixels.</summary>

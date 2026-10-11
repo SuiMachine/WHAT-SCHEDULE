@@ -139,7 +139,7 @@ namespace WhatSchedule.Documents
 
 		private static string ToData(SKColor color)
 		{
-			var packed = (uint)(color.Alpha << 24 | color.Red << 16 | color.Green << 8 | color.Blue);
+			var packed = (uint)(color.Red << 24 | color.Green << 16 | color.Blue << 8 | color.Alpha);
 			return "#" + packed.ToString("X8", CultureInfo.InvariantCulture);
 		}
 
@@ -152,10 +152,10 @@ namespace WhatSchedule.Documents
 				throw new JsonSerializationException($"Invalid color value '{value}'.");
 
 			return new SKColor(
+				(byte)(packed >> 24 & 0xFF),
 				(byte)(packed >> 16 & 0xFF),
 				(byte)(packed >> 8 & 0xFF),
-				(byte)(packed & 0xFF),
-				(byte)(packed >> 24 & 0xFF));
+				(byte)(packed & 0xFF));
 		}
 	}
 

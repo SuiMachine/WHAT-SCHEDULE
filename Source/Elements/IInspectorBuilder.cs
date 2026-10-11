@@ -1,0 +1,39 @@
+using Avalonia.Controls;
+using SkiaSharp;
+
+namespace WhatSchedule.Elements;
+
+/// <summary>
+/// The editor operations the inspector panel offers to an element describing its own
+/// rows in <see cref="CanvasElement.BuildInspectorRows"/>: typed editors that commit
+/// through the document's undo history, plus raw rows for anything custom.
+/// </summary>
+public interface IInspectorBuilder
+{
+	/// <summary>Adds a section header above the rows that follow it.</summary>
+	void AddSection(string title);
+
+	/// <summary>Adds a custom editor, or any other control, in the right-hand column.</summary>
+	void AddRow(string header, Control editor);
+
+	/// <summary>A text editor that commits on Enter or when it loses focus; empty input is discarded.</summary>
+	void AddTextBox(string header, Func<string> getter, Action<string> setter);
+
+	/// <summary>A numeric editor that commits on Enter or when it loses focus; invalid input is discarded.</summary>
+	void AddNumber(string header, Func<float> getter, Action<float> setter);
+
+	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch of the current color.</summary>
+	void AddColor(string header, Func<SKColor> getter, Action<SKColor> setter);
+
+	/// <summary>A combo box of the installed font families, with the element's family preselected.</summary>
+	void AddFontBox(string header, Func<string> getter, Action<string> setter);
+
+	/// <summary>
+	/// Re-runs <paramref name="sync"/> whenever the element changes on the canvas
+	/// (dragging, scaling, undo/redo), so the row can follow values it does not edit.
+	/// </summary>
+	void AddSync(Action sync);
+
+	/// <summary>Applies <paramref name="mutation"/> to the selected element and records it in the undo history.</summary>
+	void Apply(Action mutation);
+}

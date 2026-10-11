@@ -41,10 +41,17 @@ public class PreviewCanvas : Control, IDisposable
 
 	private IPointerDrag? activeDrag;
 
+	/// <summary>Raised after the element selected on the canvas changed.</summary>
+	internal event Action? SelectionChanged;
+
+	/// <summary>Raised whenever the document content changed, i.e. whenever the canvas re-renders.</summary>
+	internal event Action? DocumentChanged;
+
 	public PreviewCanvas()
 	{
 		Focusable = true;
 		Menus = new CanvasMenus(this);
+		Selection.SelectionChanged += () => SelectionChanged?.Invoke();
 		PointerCaptureLost += (_, _) =>
 		{
 			activeDrag = null;
@@ -119,6 +126,7 @@ public class PreviewCanvas : Control, IDisposable
 		Selection.SyncWithDocument(Document);
 		Surface.MarkDirty();
 		InvalidateVisual();
+		DocumentChanged?.Invoke();
 	}
 
 	public void Dispose()

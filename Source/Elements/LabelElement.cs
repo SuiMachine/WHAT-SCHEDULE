@@ -11,6 +11,9 @@ public sealed class LabelElement : CanvasElement
 {
 	public string Text { get; set; } = "Label";
 
+	/// <summary>The font family the text is rendered with; falls back to the default font when unavailable.</summary>
+	public string FontFamily { get; set; } = "Arial";
+
 	public float FontSize { get; set; } = 48f;
 
 	public SKColor TextColor { get; set; } = SKColors.White;
@@ -53,7 +56,27 @@ public sealed class LabelElement : CanvasElement
 			anchor.Y <= cursor.Y ? anchor.Y : anchor.Y - size.Height);
 	}
 
-	public override ElementState CaptureState() => new LabelElementState(Position, Text, FontSize, TextColor, OutlineColor, OutlineWidth, ShadowColor, ShadowBlur, ShadowOffset);
+	public override ElementState CaptureState() => new LabelElementState(Position, Text, FontFamily, FontSize, TextColor, OutlineColor, OutlineWidth, ShadowColor, ShadowBlur, ShadowOffset);
+
+	public override void BuildInspectorRows(IInspectorBuilder builder)
+	{
+		builder.AddSection("Text");
+		builder.AddTextBox("Content", () => Text, value => Text = value);
+		builder.AddFontBox("Font", () => FontFamily, value => FontFamily = value);
+		builder.AddNumber("Font Size", () => FontSize,
+			value => FontSize = Math.Max(ThemeDefinition.MinFontSize, value));
+		builder.AddColor("Color", () => TextColor, value => TextColor = value);
+
+		builder.AddSection("Outline");
+		builder.AddColor("Color", () => OutlineColor, value => OutlineColor = value);
+		builder.AddNumber("Width", () => OutlineWidth, value => OutlineWidth = Math.Max(0, value));
+
+		builder.AddSection("Shadow");
+		builder.AddColor("Color", () => ShadowColor, value => ShadowColor = value);
+		builder.AddNumber("Blur", () => ShadowBlur, value => ShadowBlur = Math.Max(0, value));
+		builder.AddNumber("Offset X", () => ShadowOffset.X, value => ShadowOffset = new SKPoint(value, ShadowOffset.Y));
+		builder.AddNumber("Offset Y", () => ShadowOffset.Y, value => ShadowOffset = new SKPoint(ShadowOffset.X, value));
+	}
 
 	public override void RestoreState(ElementState state)
 	{
@@ -62,6 +85,7 @@ public sealed class LabelElement : CanvasElement
 
 		Position = snapshot.Position;
 		Text = snapshot.Text;
+		FontFamily = snapshot.FontFamily;
 		FontSize = snapshot.FontSize;
 		TextColor = snapshot.TextColor;
 		OutlineColor = snapshot.OutlineColor;
@@ -73,11 +97,12 @@ public sealed class LabelElement : CanvasElement
 
 	private sealed record LabelScaleState(float Width, float FontSize, float OutlineWidth, float ShadowBlur, SKPoint ShadowOffset) : ScaleState;
 
-	public sealed record LabelElementState(SKPoint Position, string Text, float FontSize, SKColor TextColor, SKColor OutlineColor, float OutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset) : ElementState;
+	public sealed record LabelElementState(SKPoint Position, string Text, string FontFamily, float FontSize, SKColor TextColor, SKColor OutlineColor, float OutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset) : ElementState;
 
 	private TextOverlayOptions BuildOptions(SKPoint position) => new()
 	{
 		Text = Text,
+		FontFamily = FontFamily,
 		FontSize = FontSize,
 		TextColor = TextColor,
 		OutlineColor = OutlineColor,

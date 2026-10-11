@@ -1,4 +1,7 @@
+using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Media;
 using SkiaSharp;
 
 namespace WhatSchedule.Elements
@@ -65,6 +68,33 @@ namespace WhatSchedule.Elements
 			Position = snapshot.Position;
 			Width = snapshot.Width;
 			Height = snapshot.Height;
+		}
+
+		public override void BuildInspectorRows(IInspectorBuilder builder)
+		{
+			builder.AddSection("Size");
+			builder.AddNumber("Width", () => Width, value => Width = (float)Math.Max(ThemeDefinition.MinElementSize, value));
+			builder.AddNumber("Height", () => Height, value => Height = (float)Math.Max(ThemeDefinition.MinElementSize, value));
+
+			var ratio = new TextBlock { Opacity = 0.8, TextTrimming = TextTrimming.CharacterEllipsis };
+			void RefreshRatio()
+			{
+				var current = Height != 0 ? Width / Height : 0;
+				var original = (float)Bitmap.Width / Bitmap.Height;
+				ratio.Text = $"{current:0.###} (original {original:0.###})";
+			}
+
+			RefreshRatio();
+			builder.AddRow("Aspect Ratio", ratio);
+			builder.AddSync(RefreshRatio);
+
+			var reset = new Button { Content = "Reset Aspect Ratio", HorizontalAlignment = HorizontalAlignment.Stretch };
+			reset.Click += (_, _) => builder.Apply(() =>
+			{
+				var original = (float)Bitmap.Width / Bitmap.Height;
+				Height = (float)Math.Max(ThemeDefinition.MinElementSize, Width / original);
+			});
+			builder.AddRow(string.Empty, reset);
 		}
 
 		private sealed record ImageScaleState(float Width, float Height) : ScaleState;

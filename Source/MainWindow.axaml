@@ -21,9 +21,16 @@
 			<Button Grid.Column="3" Content="Export..." Margin="8,0,0,0" Command="{Binding ExportCommand}" />
 		</Grid>
 
-		<Border Grid.Row="2" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
-			<controls:PreviewCanvas Document="{Binding Document}" />
-		</Border>
+		<Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+			<Border Grid.Column="0" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
+				<controls:PreviewCanvas x:Name="Canvas" Document="{Binding Document}" />
+			</Border>
+			<Border Grid.Column="1" Margin="8,0,0,0" Width="280" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
+				<ScrollViewer>
+					<controls:InspectorPanel x:Name="Inspector" Margin="8" />
+				</ScrollViewer>
+			</Border>
+		</Grid>
 	</Grid>
 
 </Window>

@@ -19,7 +19,23 @@ internal sealed class SelectionLayer
 {
 	private static readonly Corner[] AllCorners = { Corner.TopLeft, Corner.TopRight, Corner.BottomRight, Corner.BottomLeft };
 
-	public CanvasElement? SelectedElement { get; set; }
+	private CanvasElement? selectedElement;
+
+	/// <summary>Raised after the selected element changed.</summary>
+	public event Action? SelectionChanged;
+
+	public CanvasElement? SelectedElement
+	{
+		get => selectedElement;
+		set
+		{
+			if (ReferenceEquals(selectedElement, value))
+				return;
+
+			selectedElement = value;
+			SelectionChanged?.Invoke();
+		}
+	}
 
 	/// <summary>Drops the selection when the document no longer contains it (e.g. a new background was loaded).</summary>
 	public void SyncWithDocument(Document? document)

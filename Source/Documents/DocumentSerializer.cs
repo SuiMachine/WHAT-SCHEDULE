@@ -67,6 +67,7 @@ namespace WhatSchedule.Documents
 				Kind = ElementData.LabelKind,
 				Position = ToData(label.Position),
 				Text = label.Text,
+				FontFamily = label.FontFamily,
 				FontSize = label.FontSize,
 				TextColor = ToData(label.TextColor),
 				OutlineColor = ToData(label.OutlineColor),
@@ -97,6 +98,7 @@ namespace WhatSchedule.Documents
 					return new LabelElement
 					{
 						Position = ToSKPoint(position),
+						FontFamily = data.FontFamily ?? "Arial",
 						Text = data.Text ?? "Label",
 						FontSize = data.FontSize ?? 48f,
 						TextColor = ToSKColor(data.TextColor, SKColors.White),
@@ -183,6 +185,7 @@ namespace WhatSchedule.Documents
 
 		public PointData? Position { get; set; }
 
+		public string? FontFamily { get; set; }
 		// Label
 		public string? Text { get; set; }
 

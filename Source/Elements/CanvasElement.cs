@@ -48,4 +48,10 @@ public abstract class CanvasElement
 	/// are in document pixels and <paramref name="state"/> is the snapshot from <see cref="BeginScale"/>.
 	/// </summary>
 	public abstract void ScaleTo(SKPoint cursor, SKPoint anchor, ScaleState state, PointerEventArgs pointerEvent);
+
+	/// <summary>
+	/// Adds this element's type-specific rows to the inspector: font and styling for labels,
+	/// size and aspect ratio for images. Position and layering rows are handled by the panel.
+	/// </summary>
+	public abstract void BuildInspectorRows(IInspectorBuilder builder);
 }

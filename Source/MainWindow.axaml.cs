@@ -8,6 +8,7 @@ public partial class MainWindow : Window
 	public MainWindow()
 	{
 		InitializeComponent();
+		Inspector.Bind(Canvas);
 	}
 
 	protected override void OnOpened(EventArgs e)

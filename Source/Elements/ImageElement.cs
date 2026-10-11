@@ -7,8 +7,7 @@ namespace WhatSchedule.Elements
 	{
 		private static readonly SKPaint BitmapPaint = new()
 		{
-			IsAntialias = true,
-			FilterQuality = SKFilterQuality.High,
+			IsAntialias = true,		
 		};
 
 		public SKBitmap Bitmap { get; }

@@ -67,6 +67,15 @@ public class PreviewCanvas : Control, IDisposable
 			return;
 		}
 
+		//PageUp/PageDown handling for moving selected item up or down in rendering hierarchy
+		//The naming is really confusing in Avalonia, but what can you do.
+		if (e.Key == Key.Prior || e.Key == Key.Next)
+		{
+			if (Selection.SelectedElement is { } element && document.ReorderTracked(element, e.Key == Key.Prior ? 1 : -1))
+				e.Handled = true;
+			return;
+		}
+
 		if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
 			return;
 

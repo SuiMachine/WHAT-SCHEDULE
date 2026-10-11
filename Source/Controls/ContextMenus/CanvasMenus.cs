@@ -4,6 +4,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using SkiaSharp;
 using WhatSchedule.Controls.Dialogs;
+using WhatSchedule.Documents;
 using WhatSchedule.Elements;
 
 namespace WhatSchedule.Controls.ContextMenus;
@@ -14,11 +15,20 @@ internal sealed class CanvasMenus
 	private readonly PreviewCanvas canvas;
 	private readonly ContextMenu rulerMenu;
 	private readonly ContextMenu canvasMenu;
+	private readonly MenuItem bringForwardItem;
+	private readonly MenuItem sendBackwardItem;
 	private SKPoint contextMenuPosition;
 
 	public CanvasMenus(PreviewCanvas canvas)
 	{
 		this.canvas = canvas;
+
+		bringForwardItem = new MenuItem { Header = "Bring Forward" };
+		bringForwardItem.Click += (_, _) => ReorderSelected(1);
+
+		sendBackwardItem = new MenuItem { Header = "Send Backward" };
+		sendBackwardItem.Click += (_, _) => ReorderSelected(-1);
+
 		rulerMenu = BuildRulerMenu();
 		canvasMenu = BuildCanvasMenu();
 	}
@@ -49,9 +59,29 @@ internal sealed class CanvasMenus
 		if (document is not { Width: > 0, Height: > 0 } || canvas.Surface.Bitmap is null)
 			return false;
 
+		UpdateLayerMenuItems(document);
 		contextMenuPosition = canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document));
 		Open(canvasMenu);
 		return true;
+	}
+
+	/// <summary>Enables the layering items when the selected element can actually move in that direction.</summary>
+	private void UpdateLayerMenuItems(Document document)
+	{
+		var elements = document.Elements;
+		var selected = canvas.Selection.SelectedElement;
+		var index = -1;
+		for (var i = 0; i < elements.Count && selected is not null; i++)
+		{
+			if (ReferenceEquals(elements[i], selected))
+			{
+				index = i;
+				break;
+			}
+		}
+
+		bringForwardItem.IsEnabled = index >= 0 && index < elements.Count - 1;
+		sendBackwardItem.IsEnabled = index > 0;
 	}
 
 	private void Open(ContextMenu menu)
@@ -102,7 +132,17 @@ internal sealed class CanvasMenus
 
 		menu.Items.Add(addLabel);
 		menu.Items.Add(addImage);
+		menu.Items.Add(new Separator());
+		menu.Items.Add(bringForwardItem);
+		menu.Items.Add(sendBackwardItem);
 		return menu;
+	}
+
+	/// <summary>Moves the selected element in the layering order by <paramref name="offset"/> steps.</summary>
+	private void ReorderSelected(int offset)
+	{
+		if (canvas.Selection.SelectedElement is { } element && canvas.Document is { } document)
+			document.ReorderTracked(element, offset);
 	}
 
 	private async Task AddLabelAsync(SKPoint position)

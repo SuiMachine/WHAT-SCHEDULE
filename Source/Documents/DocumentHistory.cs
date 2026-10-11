@@ -84,6 +84,14 @@ namespace WhatSchedule.Documents
 		}
 	}
 
+	/// <summary>An element moved within the layering order.</summary>
+	internal sealed class ElementReorderAction(CanvasElement element, int before, int after) : IHistoryAction
+	{
+		public void Undo(Document document) => document.MoveTo(element, before);
+
+		public void Redo(Document document) => document.MoveTo(element, after);
+	}
+
 	/// <summary>An element whose state changed (e.g. by moving or scaling it).</summary>
 	internal sealed class ElementStateAction(CanvasElement element, CanvasElement.ElementState before, CanvasElement.ElementState after) : IHistoryAction
 	{

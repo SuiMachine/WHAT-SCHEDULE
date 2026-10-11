@@ -57,6 +57,24 @@ public sealed class Document
 		return true;
 	}
 
+	/// <summary>
+	/// Moves an element in the layering order and records the move in the undo history.
+	/// A positive <paramref name="offset"/> moves it towards the front (drawn on top); returns false when it cannot move.
+	/// </summary>
+	public bool ReorderTracked(CanvasElement element, int offset)
+	{
+		var index = elements.IndexOf(element);
+		var target = index + offset;
+		if (index < 0 || target < 0 || target >= elements.Count)
+			return false;
+
+		elements.RemoveAt(index);
+		elements.Insert(target, element);
+		History.Push(new ElementReorderAction(element, index, target));
+		RaiseChanged();
+		return true;
+	}
+
 	/// <summary>Records an element state change in the undo history, skipping it when the state did not actually change.</summary>
 	public void RecordStateChange(CanvasElement element, CanvasElement.ElementState before)
 	{
@@ -71,6 +89,17 @@ public sealed class Document
 
 	internal void Insert(CanvasElement element, int index)
 	{
+		elements.Insert(index, element);
+		RaiseChanged();
+	}
+
+	internal void MoveTo(CanvasElement element, int index)
+	{
+		var current = elements.IndexOf(element);
+		if (current < 0 || index < 0 || index >= elements.Count || index == current)
+			return;
+
+		elements.RemoveAt(current);
 		elements.Insert(index, element);
 		RaiseChanged();
 	}

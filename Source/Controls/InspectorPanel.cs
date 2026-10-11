@@ -1,13 +1,12 @@
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using SkiaSharp;
-using WhatSchedule.Documents;
+using System.Globalization;
+using WhatSchedule.Controls.Dialogs;
 using WhatSchedule.Elements;
 
 namespace WhatSchedule.Controls;
@@ -250,17 +249,24 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
 	}
 
-	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch of the current color.</summary>
+	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch that opens the color picker dialog when pressed.</summary>
 	private void AddColor(string header, Func<SKColor> get, Action<SKColor> set)
 	{
-		var swatch = new Border
+		var swatchFill = new Border
 		{
-			Width = 18,
-			Height = 18,
 			CornerRadius = new CornerRadius(3),
 			BorderBrush = ThemeDefinition.Border,
 			BorderThickness = new Thickness(1),
 		};
+		var swatch = new Button
+		{
+			Width = 18,
+			Height = 18,
+			Padding = new Thickness(0),
+			Content = swatchFill,
+			Cursor = new Cursor(StandardCursorType.Hand),
+		};
+
 		var box = new TextBox { MinWidth = 90 };
 		var editor = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
 		editor.Children.Add(swatch);
@@ -270,7 +276,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		{
 			var color = get();
 			box.Text = "#" + ToHex(color);
-			swatch.Background = new ImmutableSolidColorBrush(Color.FromArgb(color.Alpha, color.Red, color.Green, color.Blue));
+			swatchFill.Background = new ImmutableSolidColorBrush(Color.FromArgb(color.Alpha, color.Red, color.Green, color.Blue));
 		}
 
 		void Commit()
@@ -296,6 +302,20 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			e.Handled = true;
 		};
 
+		swatch.Click += async (_, _) =>
+		{
+			var owner = TopLevel.GetTopLevel(this) as Window;
+			if (owner is null)
+				return;
+
+			var current = get();
+			var picked = await ColorPickerDialog.ShowDialog(owner, current);
+			if (picked is not { } value)
+				return;
+
+			Apply(() => set(picked.Value));
+			Refresh();
+		};
 		AddRow(header, editor);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
 	}

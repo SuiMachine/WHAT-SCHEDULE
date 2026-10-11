@@ -136,9 +136,9 @@ internal sealed class ElementScaleDrag : IPointerDrag
 internal sealed class GuideDrag : IPointerDrag
 {
 	private readonly PreviewCanvas canvas;
-	private readonly GuideLine guide;
+	private readonly Guide guide;
 
-	public GuideDrag(PreviewCanvas canvas, GuideLine guide)
+	public GuideDrag(PreviewCanvas canvas, Guide guide)
 	{
 		this.canvas = canvas;
 		this.guide = guide;
@@ -159,9 +159,9 @@ internal sealed class GuideDrag : IPointerDrag
 	public void Release(Point position)
 	{
 		//Dropping the guide back onto its ruler removes it.
-		if (GuideLayer.IsOverRuler(guide, position))
+		if (GuideLayer.IsOverRuler(guide, position) && canvas.Document is { } document)
 		{
-			canvas.Guides.Remove(guide);
+			document.RemoveGuide(guide);
 			canvas.InvalidateVisual();
 		}
 	}

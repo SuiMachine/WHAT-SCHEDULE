@@ -1,4 +1,3 @@
-using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,7 +10,9 @@ namespace WhatSchedule.ViewModels;
 
 public partial class MainWindowViewModel : ObservableObject
 {
+	private const string EXTENSION = "*.wschedule";
 	private string overlayText = "WHAT SCHEDULE";
+	private Document document = null!;
 
 	public string OverlayText
 	{
@@ -20,7 +21,11 @@ public partial class MainWindowViewModel : ObservableObject
 	}
 
 	/// <summary>The document being edited; the canvas renders and modifies this.</summary>
-	public Document Document { get; }
+	public Document Document
+	{
+		get => document;
+		private set => SetProperty(ref document, value);
+	}
 
 	/// <summary>Set by the main window so commands can open file pickers.</summary>
 	public IStorageProvider? StorageProvider { get; set; }
@@ -52,6 +57,55 @@ public partial class MainWindowViewModel : ObservableObject
 			return;
 
 		Document.PrepareNewWithBackground(bitmap);
+	}
+
+	[RelayCommand]
+	private async Task LoadAsync()
+	{
+		var provider = StorageProvider;
+		if (provider is null)
+			return;
+
+		IReadOnlyList<IStorageFile>? file = await provider.OpenFilePickerAsync(new FilePickerOpenOptions
+		{
+			Title = "Open schedule document",
+			AllowMultiple = false,
+			FileTypeFilter = [new FilePickerFileType("WHAT Schedule document") { Patterns = [EXTENSION] }],
+		});
+
+		if (file is null || file.Count == 0 || file[0] is null)
+			return;
+
+		try
+		{
+			await using var stream = await file[0].OpenReadAsync();
+			Document = DocumentSerializer.Load(stream);
+		}
+		catch
+		{
+			//An invalid or foreign file leaves the current document untouched.
+		}
+	}
+
+	[RelayCommand]
+	private async Task SaveAsync()
+	{
+		var provider = StorageProvider;
+		if (provider is null)
+			return;
+
+		var file = await provider.SaveFilePickerAsync(new FilePickerSaveOptions
+		{
+			Title = "Save schedule document",
+			SuggestedFileName = "schedule",
+			DefaultExtension = "json",
+			FileTypeChoices = [new FilePickerFileType("WHAT Schedule document") { Patterns = [EXTENSION] }],
+		});
+		if (file is null)
+			return;
+
+		await using var stream = await file.OpenWriteAsync();
+		DocumentSerializer.Save(Document, stream);
 	}
 
 	[RelayCommand]

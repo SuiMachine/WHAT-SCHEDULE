@@ -10,6 +10,7 @@ namespace WhatSchedule.Documents;
 public sealed class Document
 {
 	private readonly List<CanvasElement> elements = new();
+	private readonly List<Guide> guides = new();
 
 	/// <summary>Raised whenever the document content changes and needs re-rendering.</summary>
 	public event Action? Changed;
@@ -24,6 +25,9 @@ public sealed class Document
 	public int Height => Background?.Height ?? 0;
 
 	public IReadOnlyList<CanvasElement> Elements => elements;
+
+	/// <summary>User-placed aligning lines in document coordinates; drawn in the editor only.</summary>
+	public IReadOnlyList<Guide> Guides => guides;
 
 	/// <summary>Adds an element without recording it in the undo history.</summary>
 	public void Add(CanvasElement element)
@@ -77,10 +81,28 @@ public sealed class Document
 		RaiseChanged();
 	}
 
+	/// <summary>Adds a guide line without recording it in the undo history.</summary>
+	public void AddGuide(Guide guide)
+	{
+		guides.Add(guide);
+		RaiseChanged();
+	}
+
+	/// <summary>Removes a guide line. Returns false when the guide is not in the document.</summary>
+	public bool RemoveGuide(Guide guide)
+	{
+		if (!guides.Remove(guide))
+			return false;
+
+		RaiseChanged();
+		return true;
+	}
+
 	internal void PrepareNewWithBackground(SKBitmap bitmap)
 	{
 		this.Background = bitmap;
 		elements.Clear();
+		guides.Clear();
 		History.Clear();
 		RaiseChanged();
 	}

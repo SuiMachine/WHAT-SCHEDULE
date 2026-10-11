@@ -27,7 +27,6 @@ public class PreviewCanvas : Control, IDisposable
 	internal CanvasViewport Viewport { get; } = new();
 	internal PreviewSurface Surface { get; } = new();
 	internal RulerRenderer Rulers { get; } = new();
-	internal GuideLayer Guides { get; } = new();
 	internal SelectionLayer Selection { get; } = new();
 	internal CanvasMenus Menus { get; }
 
@@ -101,7 +100,6 @@ public class PreviewCanvas : Control, IDisposable
 			Surface.Dispose();
 			Viewport.ResetFit();
 			Selection.SelectedElement = null;
-			Guides.Clear();
 			activeDrag = null;
 			InvalidateVisual();
 		}
@@ -167,7 +165,7 @@ public class PreviewCanvas : Control, IDisposable
 			if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
 				return new ElementScaleDrag(this, corner);
 
-			var guide = Guides.CreateFromRuler(position, document, imageRect, Viewport.Scale) ?? Guides.HitTest(position, imageRect, Viewport.Scale);
+			var guide = GuideLayer.CreateFromRuler(position, document, imageRect, Viewport.Scale) ?? GuideLayer.HitTest(position, document, imageRect, Viewport.Scale);
 			if (guide is not null)
 				return new GuideDrag(this, guide);
 
@@ -237,7 +235,7 @@ public class PreviewCanvas : Control, IDisposable
 		var imageRect = GetImageRect(document);
 		if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
 			Cursor = CanvasCursors.ForCorner(corner);
-		else if (Guides.HitTest(position, imageRect, Viewport.Scale) is { } guide)
+		else if (GuideLayer.HitTest(position, document, imageRect, Viewport.Scale) is { } guide)
 			Cursor = guide.IsHorizontal ? CanvasCursors.HorizontalGuide : CanvasCursors.VerticalGuide;
 		else if (HitTestElement(position) is not null)
 			Cursor = CanvasCursors.Move;
@@ -286,10 +284,7 @@ public class PreviewCanvas : Control, IDisposable
 			return;
 
 		if (Surface.EnsureSize(document))
-		{
 			Viewport.ResetFit();
-			Guides.Clear();
-		}
 
 		Viewport.TryInitialFit(ContentRect, new Size(document.Width, document.Height));
 		Surface.Render(document);
@@ -297,7 +292,7 @@ public class PreviewCanvas : Control, IDisposable
 		var imageRect = GetImageRect(document);
 		context.DrawImage(Surface.Bitmap!, imageRect);
 		Selection.Draw(context, imageRect, Viewport.Scale);
-		Guides.Draw(context, ContentRect, imageRect, Viewport.Scale);
+		GuideLayer.Draw(context, ContentRect, imageRect, Viewport.Scale, document);
 		Rulers.Draw(context, bounds, imageRect, new Size(document.Width, document.Height), Viewport.Scale);
 	}
 }

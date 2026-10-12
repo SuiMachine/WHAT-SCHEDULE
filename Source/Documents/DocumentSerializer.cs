@@ -67,6 +67,7 @@ namespace WhatSchedule.Documents
 			LabelElement label => new LabelElement.LabelElementData
 			{
 				Position = ToData(label.Position),
+				Rotation = label.Rotation,
 				Text = label.Text,
 				FontFamily = label.FontFamily,
 				FontSize = label.FontSize,
@@ -80,6 +81,7 @@ namespace WhatSchedule.Documents
 			ImageElement image => new ImageElement.ImageElementData
 			{
 				Position = ToData(image.Position),
+				Rotation = image.Rotation,
 				Png = EncodePng(image.Bitmap),
 				Width = image.Width,
 				Height = image.Height
@@ -92,10 +94,11 @@ namespace WhatSchedule.Documents
 			if (data.Position is not { } position)
 				throw new JsonSerializationException("An element is missing its position.");
 
+			CanvasElement element;
 			switch (data)
 			{
 				case LabelElement.LabelElementData label:
-					return new LabelElement
+					element = new LabelElement
 					{
 						Position = ToSKPoint(position),
 						Text = label.Text,
@@ -108,21 +111,26 @@ namespace WhatSchedule.Documents
 						ShadowBlur = label.ShadowBlur,
 						ShadowOffset = label.ShadowOffset is { } shadowOffset ? ToSKPoint(shadowOffset) : new SKPoint(3f, 3f)
 					};
+					break;
 				case ImageElement.ImageElementData image:
 					{
 						var bitmap = image.Png is null ? null : SKBitmap.Decode(Convert.FromBase64String(image.Png));
 						if (bitmap is null)
 							throw new JsonSerializationException("An image element could not be decoded.");
 
-						return new ImageElement(bitmap, ToSKPoint(position))
+						element = new ImageElement(bitmap, ToSKPoint(position))
 						{
 							Width = image.Width ?? bitmap.Width,
 							Height = image.Height ?? bitmap.Height
 						};
+						break;
 					}
 				default:
 					throw new JsonSerializationException($"Unknown element kind '{data.Kind}'.");
 			}
+
+			element.Rotation = data.Rotation ?? 0f;
+			return element;
 		}
 
 		private static string EncodePng(SKBitmap? bitmap)

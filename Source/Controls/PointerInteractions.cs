@@ -100,6 +100,7 @@ internal sealed class ElementScaleDrag : IPointerDrag
 	private readonly PreviewCanvas canvas;
 	private readonly Corner corner;
 	private readonly SKPoint anchor;
+	private readonly SKPoint anchorWorld;
 	private readonly CanvasElement.ScaleState start;
 	private readonly CanvasElement.ElementState startState;
 
@@ -109,6 +110,7 @@ internal sealed class ElementScaleDrag : IPointerDrag
 		this.corner = corner;
 		var element = canvas.Selection.SelectedElement!;
 		anchor = SelectionLayer.GetAnchor(element.Bounds, corner);
+		anchorWorld = element.ToDocument(anchor);
 		start = element.BeginScale();
 		startState = element.CaptureState();
 	}
@@ -122,7 +124,16 @@ internal sealed class ElementScaleDrag : IPointerDrag
 		if (element is null || document is null)
 			return;
 
-		element.ScaleTo(canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document)), anchor, start, e);
+		//Scaling happens in the element's unrotated frame: the cursor is rotated into
+		//local space, and afterwards the element is shifted so the anchor corner stays
+		//pinned at the same document-space point regardless of rotation.
+		var documentCursor = canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document));
+		element.ScaleTo(element.ToLocal(documentCursor), anchor, start, e);
+
+		var shifted = element.ToDocument(anchor);
+		if (shifted != anchorWorld)
+			element.Position += anchorWorld - shifted;
+
 		document.RaiseChanged();
 	}
 
@@ -130,6 +141,61 @@ internal sealed class ElementScaleDrag : IPointerDrag
 	{
 		if (canvas.Selection.SelectedElement is { } element)
 			canvas.Document?.RecordStateChange(element, startState);
+	}
+}
+
+internal sealed class ElementRotateDrag : IPointerDrag
+{
+	private readonly PreviewCanvas canvas;
+	private readonly CanvasElement element;
+	private readonly SKPoint center;
+	private readonly float startRotation;
+	private readonly CanvasElement.ElementState startState;
+	private float lastAngle;
+
+	public ElementRotateDrag(PreviewCanvas canvas, Point position)
+	{
+		this.canvas = canvas;
+		element = canvas.Selection.SelectedElement!;
+		center = element.Center;
+		startRotation = element.Rotation;
+		lastAngle = AngleTo(position);
+		startState = element.CaptureState();
+	}
+
+	public Cursor Cursor => CanvasCursors.Rotate;
+
+	public void Move(Point position, PointerEventArgs e)
+	{
+		var document = canvas.Document;
+		if (document is null)
+			return;
+
+		//The rotation follows the cursor's angle around the center, accumulated per move
+		//so drags crossing the -180/180 degree line stay continuous. Shift snaps to steps.
+		var angle = AngleTo(position);
+		var delta = (angle - lastAngle + 540) % 360 - 180;
+		lastAngle = angle;
+
+		var rotation = element.Rotation + delta;
+		if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+			rotation = (float)(Math.Round(rotation / ThemeDefinition.RotationSnap) * ThemeDefinition.RotationSnap);
+
+		element.Rotation = rotation;
+		document.RaiseChanged();
+	}
+
+	public void Release(Point position)
+	{
+		canvas.Document?.RecordStateChange(element, startState);
+	}
+
+	/// <summary>The angle from the element's center to <paramref name="position"/>, in degrees.</summary>
+	private float AngleTo(Point position)
+	{
+		var document = canvas.Document!;
+		var point = canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document));
+		return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * 180 / Math.PI);
 	}
 }
 

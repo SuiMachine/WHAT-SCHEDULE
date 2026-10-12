@@ -11,6 +11,7 @@ internal static class CanvasCursors
 	private static readonly Cursor BottomLeft = new(StandardCursorType.BottomLeftCorner);
 
 	public static readonly Cursor Move = new(StandardCursorType.SizeAll);
+	public static readonly Cursor Rotate = new(StandardCursorType.Cross);
 	public static readonly Cursor HorizontalGuide = new(StandardCursorType.SizeNorthSouth);
 	public static readonly Cursor VerticalGuide = new(StandardCursorType.SizeWestEast);
 

@@ -30,7 +30,14 @@ public sealed class LabelElement : CanvasElement
 
 	public override SKSize Size => ImageTextRenderer.Measure(BuildOptions(SKPoint.Empty));
 
-	public override void Draw(SKCanvas canvas) => ImageTextRenderer.Draw(canvas, BuildOptions(Position));
+	public override void Draw(SKCanvas canvas)
+	{
+		var bounds = Bounds;
+		var count = canvas.Save();
+		canvas.RotateDegrees(Rotation, bounds.MidX, bounds.MidY);
+		ImageTextRenderer.Draw(canvas, BuildOptions(Position));
+		canvas.RestoreToCount(count);
+	}
 
 	public override ScaleState BeginScale() => new LabelScaleState(Size.Width, FontSize, OutlineWidth, ShadowBlur, ShadowOffset);
 
@@ -56,7 +63,7 @@ public sealed class LabelElement : CanvasElement
 			anchor.Y <= cursor.Y ? anchor.Y : anchor.Y - size.Height);
 	}
 
-	public override ElementState CaptureState() => new LabelElementState(Position, Text, FontFamily, FontSize, TextColor, OutlineColor, OutlineWidth, ShadowColor, ShadowBlur, ShadowOffset);
+	public override ElementState CaptureState() => new LabelElementState(Position, Rotation, Text, FontFamily, FontSize, TextColor, OutlineColor, OutlineWidth, ShadowColor, ShadowBlur, ShadowOffset);
 
 	public override void BuildInspectorRows(IInspectorBuilder builder)
 	{
@@ -84,6 +91,7 @@ public sealed class LabelElement : CanvasElement
 			return;
 
 		Position = snapshot.Position;
+		Rotation = snapshot.Rotation;
 		Text = snapshot.Text;
 		FontFamily = snapshot.FontFamily;
 		FontSize = snapshot.FontSize;
@@ -97,7 +105,7 @@ public sealed class LabelElement : CanvasElement
 
 	private sealed record LabelScaleState(float Width, float FontSize, float OutlineWidth, float ShadowBlur, SKPoint ShadowOffset) : ScaleState;
 
-	public sealed record LabelElementState(SKPoint Position, string Text, string FontFamily, float FontSize, SKColor TextColor, SKColor OutlineColor, float OutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset) : ElementState;
+	public sealed record LabelElementState(SKPoint Position, float Rotation, string Text, string FontFamily, float FontSize, SKColor TextColor, SKColor OutlineColor, float OutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset) : ElementState;
 
 	private TextOverlayOptions BuildOptions(SKPoint position) => new()
 	{

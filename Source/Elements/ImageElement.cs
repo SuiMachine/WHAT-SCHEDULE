@@ -56,9 +56,16 @@ namespace WhatSchedule.Elements
 			}
 		}
 
-		public override void Draw(SKCanvas canvas) => canvas.DrawBitmap(Bitmap, SKRect.Create(Position, Size), BitmapPaint);
+		public override void Draw(SKCanvas canvas)
+		{
+			var bounds = Bounds;
+			var count = canvas.Save();
+			canvas.RotateDegrees(Rotation, bounds.MidX, bounds.MidY);
+			canvas.DrawBitmap(Bitmap, bounds, BitmapPaint);
+			canvas.RestoreToCount(count);
+		}
 
-		public override ElementState CaptureState() => new ImageElementState(Position, Width, Height);
+		public override ElementState CaptureState() => new ImageElementState(Position, Rotation, Width, Height);
 
 		public override void RestoreState(ElementState state)
 		{
@@ -66,6 +73,7 @@ namespace WhatSchedule.Elements
 				return;
 
 			Position = snapshot.Position;
+			Rotation = snapshot.Rotation;
 			Width = snapshot.Width;
 			Height = snapshot.Height;
 		}
@@ -99,7 +107,7 @@ namespace WhatSchedule.Elements
 
 		private sealed record ImageScaleState(float Width, float Height) : ScaleState;
 
-		public sealed record ImageElementState(SKPoint Position, float Width, float Height) : ElementState;
+		public sealed record ImageElementState(SKPoint Position, float Rotation, float Width, float Height) : ElementState;
 
 		public sealed class ImageElementData : ElementData
 		{

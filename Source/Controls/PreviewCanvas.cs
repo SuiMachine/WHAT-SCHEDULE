@@ -179,6 +179,9 @@ public class PreviewCanvas : Control, IDisposable
 
 		if (Surface.Bitmap is not null)
 		{
+			if (Selection.SelectedElement is not null && Selection.HitTestRotateHandle(position, imageRect, Viewport.Scale))
+				return new ElementRotateDrag(this, position);
+
 			if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
 				return new ElementScaleDrag(this, corner);
 
@@ -250,7 +253,9 @@ public class PreviewCanvas : Control, IDisposable
 		}
 
 		var imageRect = GetImageRect(document);
-		if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
+		if (Selection.SelectedElement is not null && Selection.HitTestRotateHandle(position, imageRect, Viewport.Scale))
+			Cursor = CanvasCursors.Rotate;
+		else if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
 			Cursor = CanvasCursors.ForCorner(corner);
 		else if (GuideLayer.HitTest(position, document, imageRect, Viewport.Scale) is { } guide)
 			Cursor = guide.IsHorizontal ? CanvasCursors.HorizontalGuide : CanvasCursors.VerticalGuide;

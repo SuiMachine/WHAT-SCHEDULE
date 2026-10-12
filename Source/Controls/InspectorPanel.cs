@@ -74,6 +74,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		AddSection("Position");
 		AddNumber("X", () => element.Position.X, value => element.Position = new SKPoint(value, element.Position.Y));
 		AddNumber("Y", () => element.Position.Y, value => element.Position = new SKPoint(element.Position.X, value));
+		AddNumber("Rotation", () => element.Rotation, value => element.Rotation = value);
 
 		AddSection("Layer");
 		AddLayerRow(element);

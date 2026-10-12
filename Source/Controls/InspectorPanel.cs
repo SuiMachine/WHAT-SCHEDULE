@@ -268,8 +268,10 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			Cursor = new Cursor(StandardCursorType.Hand),
 		};
 
-		var box = new TextBox { MinWidth = 90 };
-		var editor = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+		var box = new TextBox { Margin = new Thickness(6, 2, 0, 2) };
+		var editor = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+		Grid.SetColumn(swatch, 0);
+		Grid.SetColumn(box, 1);
 		editor.Children.Add(swatch);
 		editor.Children.Add(box);
 

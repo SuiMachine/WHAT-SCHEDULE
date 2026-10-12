@@ -84,7 +84,20 @@ namespace WhatSchedule.Documents
 				Rotation = image.Rotation,
 				Png = EncodePng(image.Bitmap),
 				Width = image.Width,
-				Height = image.Height
+				Height = image.Height,
+				CropX = image.Crop.Left,
+				CropY = image.Crop.Top,
+				CropWidth = image.Crop.Width,
+				CropHeight = image.Crop.Height,
+				Opacity = image.Opacity,
+				CornerRadius = image.CornerRadius,
+				FlipX = image.FlipX,
+				FlipY = image.FlipY,
+				ShadowColor = ToData(image.ShadowColor),
+				ShadowBlur = image.ShadowBlur,
+				ShadowOffset = ToData(image.ShadowOffset),
+				TintColor = ToData(image.TintColor),
+				TintMode = image.TintMode.ToString()
 			},
 			_ => throw new NotSupportedException($"Cannot save {element.GetType().Name} elements.")
 		};
@@ -118,11 +131,23 @@ namespace WhatSchedule.Documents
 						if (bitmap is null)
 							throw new JsonSerializationException("An image element could not be decoded.");
 
-						element = new ImageElement(bitmap, ToSKPoint(position))
+						var restored = new ImageElement(bitmap, ToSKPoint(position))
 						{
 							Width = image.Width ?? bitmap.Width,
-							Height = image.Height ?? bitmap.Height
+							Height = image.Height ?? bitmap.Height,
+							Opacity = image.Opacity ?? 1f,
+							CornerRadius = image.CornerRadius ?? 0f,
+							FlipX = image.FlipX ?? false,
+							FlipY = image.FlipY ?? false,
+							ShadowColor = ToSKColor(image.ShadowColor, SKColor.Empty),
+							ShadowBlur = image.ShadowBlur ?? 6f,
+							ShadowOffset = image.ShadowOffset is { } imageShadowOffset ? ToSKPoint(imageShadowOffset) : new SKPoint(3f, 3f),
+							TintColor = ToSKColor(image.TintColor, SKColor.Empty),
+							TintMode = Enum.TryParse(image.TintMode, out SKBlendMode tintMode) ? tintMode : SKBlendMode.SrcIn
 						};
+						if (image.CropX is { } cropX && image.CropY is { } cropY && image.CropWidth is { } cropWidth && image.CropHeight is { } cropHeight)
+							restored.Crop = SKRect.Create(cropX, cropY, cropWidth, cropHeight);
+						element = restored;
 						break;
 					}
 				default:

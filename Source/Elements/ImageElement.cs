@@ -10,7 +10,7 @@ namespace WhatSchedule.Elements
 	{
 		private static readonly SKPaint BitmapPaint = new()
 		{
-			IsAntialias = true,		
+			IsAntialias = true,
 		};
 
 		public SKBitmap Bitmap { get; }
@@ -19,12 +19,49 @@ namespace WhatSchedule.Elements
 
 		public float Height { get; set; }
 
+		private SKRect crop;
+
+		/// <summary>The part of the bitmap that is drawn, in bitmap pixels; always kept inside the bitmap and non-empty.</summary>
+		public SKRect Crop
+		{
+			get => crop;
+			set => crop = ClampCrop(value);
+		}
+
+		/// <summary>How opaque the image is drawn, 0 (invisible) to 1 (fully opaque).</summary>
+		public float Opacity { get; set; } = 1f;
+
+		/// <summary>The radius the image's corners are rounded with, in document pixels.</summary>
+		public float CornerRadius { get; set; }
+
+		/// <summary>Whether the image is mirrored horizontally.</summary>
+		public bool FlipX { get; set; }
+
+		/// <summary>Whether the image is mirrored vertically.</summary>
+		public bool FlipY { get; set; }
+
+		/// <summary>The color of the drop shadow; alpha 0 disables the shadow.</summary>
+		public SKColor ShadowColor { get; set; }
+
+		/// <summary>How blurred the drop shadow is, in sigma pixels.</summary>
+		public float ShadowBlur { get; set; } = 6f;
+
+		/// <summary>How far the drop shadow is displaced, in document pixels.</summary>
+		public SKPoint ShadowOffset { get; set; } = new(3f, 3f);
+
+		/// <summary>The color the image is tinted with; alpha 0 disables the tint.</summary>
+		public SKColor TintColor { get; set; }
+
+		/// <summary>How the tint color is combined with the image.</summary>
+		public SKBlendMode TintMode { get; set; } = SKBlendMode.SrcIn;
+
 		public ImageElement(SKBitmap bitmap, SKPoint position)
 		{
 			Bitmap = bitmap ?? throw new ArgumentNullException(nameof(bitmap));
 			Position = position;
 			Width = bitmap.Width;
 			Height = bitmap.Height;
+			Crop = new SKRect(0, 0, bitmap.Width, bitmap.Height);
 		}
 
 		public override SKSize Size => new(Width, Height);
@@ -61,11 +98,69 @@ namespace WhatSchedule.Elements
 			var bounds = Bounds;
 			var count = canvas.Save();
 			canvas.RotateDegrees(Rotation, bounds.MidX, bounds.MidY);
-			canvas.DrawBitmap(Bitmap, bounds, BitmapPaint);
+			canvas.Translate(bounds.MidX, bounds.MidY);
+			canvas.Scale(FlipX ? -1 : 1, FlipY ? -1 : 1);
+			canvas.Translate(-bounds.MidX, -bounds.MidY);
+
+			if (ShadowColor.Alpha > 0)
+			{
+				//The shadow is cast from the element's own (rounded) shape rather than the
+				//bitmap's alpha, so partly transparent PNGs still get a clean card shadow.
+				var shadowColor = ShadowColor.WithAlpha((byte)Math.Round(ShadowColor.Alpha * Math.Clamp(Opacity, 0f, 1f)));
+				using var shadowFilter = SKImageFilter.CreateDropShadowOnly(ShadowOffset.X, ShadowOffset.Y, ShadowBlur, ShadowBlur, shadowColor);
+				BitmapPaint.BlendMode = SKBlendMode.SrcOver;
+				BitmapPaint.Color = SKColors.Black;
+				BitmapPaint.ImageFilter = shadowFilter;
+				if (CornerRadius > 0)
+				{
+					using var shape = new SKPath();
+					shape.AddRoundRect(bounds, CornerRadius, CornerRadius);
+					canvas.DrawPath(shape, BitmapPaint);
+				}
+				else
+				{
+					canvas.DrawRect(bounds, BitmapPaint);
+				}
+				BitmapPaint.ImageFilter = null;
+			}
+
+			if (CornerRadius > 0)
+			{
+				canvas.Save();
+				using var clip = new SKPath();
+				clip.AddRoundRect(bounds, CornerRadius, CornerRadius);
+				canvas.ClipPath(clip, SKClipOperation.Intersect, true);
+			}
+
+			BitmapPaint.BlendMode = SKBlendMode.SrcOver;
+			BitmapPaint.Color = SKColors.White.WithAlpha((byte)Math.Round(Math.Clamp(Opacity, 0f, 1f) * 255));
+			canvas.DrawBitmap(Bitmap, Crop, bounds, BitmapPaint);
+
+			if (TintColor.Alpha > 0)
+			{
+				BitmapPaint.BlendMode = TintMode;
+				BitmapPaint.Color = TintColor;
+				canvas.DrawBitmap(Bitmap, Crop, bounds, BitmapPaint);
+				BitmapPaint.BlendMode = SKBlendMode.SrcOver;
+			}
+
+			if (CornerRadius > 0)
+				canvas.Restore();
+
 			canvas.RestoreToCount(count);
 		}
 
-		public override ElementState CaptureState() => new ImageElementState(Position, Rotation, Width, Height);
+		/// <summary>Clamps <paramref name="crop"/> so it stays inside the bitmap and never collapses to nothing.</summary>
+		private SKRect ClampCrop(SKRect crop)
+		{
+			var left = Math.Clamp(crop.Left, 0, Math.Max(0, Bitmap.Width - 1));
+			var top = Math.Clamp(crop.Top, 0, Math.Max(0, Bitmap.Height - 1));
+			var right = Math.Clamp(crop.Right, left + 1, Bitmap.Width);
+			var bottom = Math.Clamp(crop.Bottom, top + 1, Bitmap.Height);
+			return new SKRect(left, top, right, bottom);
+		}
+
+		public override ElementState CaptureState() => new ImageElementState(Position, Rotation, Width, Height, Crop, Opacity, CornerRadius, FlipX, FlipY, ShadowColor, ShadowBlur, ShadowOffset, TintColor, TintMode);
 
 		public override void RestoreState(ElementState state)
 		{
@@ -76,6 +171,16 @@ namespace WhatSchedule.Elements
 			Rotation = snapshot.Rotation;
 			Width = snapshot.Width;
 			Height = snapshot.Height;
+			Crop = snapshot.Crop;
+			Opacity = snapshot.Opacity;
+			CornerRadius = snapshot.CornerRadius;
+			FlipX = snapshot.FlipX;
+			FlipY = snapshot.FlipY;
+			ShadowColor = snapshot.ShadowColor;
+			ShadowBlur = snapshot.ShadowBlur;
+			ShadowOffset = snapshot.ShadowOffset;
+			TintColor = snapshot.TintColor;
+			TintMode = snapshot.TintMode;
 		}
 
 		public override void BuildInspectorRows(IInspectorBuilder builder)
@@ -88,7 +193,7 @@ namespace WhatSchedule.Elements
 			void RefreshRatio()
 			{
 				var current = Height != 0 ? Width / Height : 0;
-				var original = (float)Bitmap.Width / Bitmap.Height;
+				var original = Crop.Height != 0 ? Crop.Width / Crop.Height : 0;
 				ratio.Text = $"{current:0.###} (original {original:0.###})";
 			}
 
@@ -99,15 +204,55 @@ namespace WhatSchedule.Elements
 			var reset = new Button { Content = "Reset Aspect Ratio", HorizontalAlignment = HorizontalAlignment.Stretch };
 			reset.Click += (_, _) => builder.Apply(() =>
 			{
-				var original = (float)Bitmap.Width / Bitmap.Height;
+				var original = Crop.Height != 0 ? Crop.Width / Crop.Height : 0;
 				Height = (float)Math.Max(ThemeDefinition.MinElementSize, Width / original);
 			});
 			builder.AddRow(string.Empty, reset);
+
+			builder.AddSection("Crop");
+			builder.AddNumber("X", () => Crop.Left, value => Crop = SKRect.Create(value, Crop.Top, Crop.Width, Crop.Height));
+			builder.AddNumber("Y", () => Crop.Top, value => Crop = SKRect.Create(Crop.Left, value, Crop.Width, Crop.Height));
+			builder.AddNumber("Width", () => Crop.Width, value => Crop = SKRect.Create(Crop.Left, Crop.Top, Math.Max(1, value), Crop.Height));
+			builder.AddNumber("Height", () => Crop.Height, value => Crop = SKRect.Create(Crop.Left, Crop.Top, Crop.Width, Math.Max(1, value)));
+
+			var resetCrop = new Button { Content = "Reset Crop", HorizontalAlignment = HorizontalAlignment.Stretch };
+			resetCrop.Click += (_, _) => builder.Apply(() => Crop = new SKRect(0, 0, Bitmap.Width, Bitmap.Height));
+			builder.AddRow(string.Empty, resetCrop);
+
+			builder.AddSection("Appearance");
+			builder.AddNumber("Opacity %", () => Opacity * 100f, value => Opacity = (float)Math.Clamp(value, 0, 100) / 100f);
+			builder.AddNumber("Corner Radius", () => CornerRadius, value => CornerRadius = Math.Max(0, value));
+			builder.AddToggle("Flip Horizontal", () => FlipX, value => FlipX = value);
+			builder.AddToggle("Flip Vertical", () => FlipY, value => FlipY = value);
+
+			builder.AddSection("Drop Shadow");
+			builder.AddColor("Color", () => ShadowColor, value => ShadowColor = value);
+			builder.AddNumber("Blur", () => ShadowBlur, value => ShadowBlur = Math.Max(0, value));
+			builder.AddNumber("Offset X", () => ShadowOffset.X, value => ShadowOffset = new SKPoint(value, ShadowOffset.Y));
+			builder.AddNumber("Offset Y", () => ShadowOffset.Y, value => ShadowOffset = new SKPoint(ShadowOffset.X, value));
+
+			builder.AddSection("Tint");
+			builder.AddColor("Color", () => TintColor, value => TintColor = value);
+
+			var modes = new[] { SKBlendMode.SrcIn, SKBlendMode.Multiply, SKBlendMode.Screen, SKBlendMode.Overlay, SKBlendMode.SoftLight, SKBlendMode.HardLight, SKBlendMode.Plus };
+			var modeBox = new ComboBox { ItemsSource = modes.Select(mode => mode.ToString()).ToArray(), SelectedItem = TintMode.ToString() };
+			modeBox.SelectionChanged += (_, _) =>
+			{
+				if (modeBox.SelectedItem is string name && Enum.TryParse(name, out SKBlendMode mode) && mode != TintMode)
+					builder.Apply(() => TintMode = mode);
+			};
+			builder.AddRow("Mode", modeBox);
+			builder.AddSync(() =>
+			{
+				var current = TintMode.ToString();
+				if (modeBox.SelectedItem as string != current)
+					modeBox.SelectedItem = current;
+			});
 		}
 
 		private sealed record ImageScaleState(float Width, float Height) : ScaleState;
 
-		public sealed record ImageElementState(SKPoint Position, float Rotation, float Width, float Height) : ElementState;
+		public sealed record ImageElementState(SKPoint Position, float Rotation, float Width, float Height, SKRect Crop, float Opacity, float CornerRadius, bool FlipX, bool FlipY, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset, SKColor TintColor, SKBlendMode TintMode) : ElementState;
 
 		public sealed class ImageElementData : ElementData
 		{
@@ -120,6 +265,33 @@ namespace WhatSchedule.Elements
 			public float? Width { get; set; }
 
 			public float? Height { get; set; }
+
+			/// <summary>The crop rectangle in bitmap pixels; null in documents saved before cropping existed.</summary>
+			public float? CropX { get; set; }
+
+			public float? CropY { get; set; }
+
+			public float? CropWidth { get; set; }
+
+			public float? CropHeight { get; set; }
+
+			public float? Opacity { get; set; }
+
+			public float? CornerRadius { get; set; }
+
+			public bool? FlipX { get; set; }
+
+			public bool? FlipY { get; set; }
+
+			public string? ShadowColor { get; set; }
+
+			public float? ShadowBlur { get; set; }
+
+			public CanvasElement.PointData? ShadowOffset { get; set; }
+
+			public string? TintColor { get; set; }
+
+			public string? TintMode { get; set; }
 		}
 	}
 }

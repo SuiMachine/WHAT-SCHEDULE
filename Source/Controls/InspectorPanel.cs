@@ -87,6 +87,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddRow(string header, Control editor) => AddRow(header, editor);
 	void IInspectorBuilder.AddTextBox(string header, Func<string> getter, Action<string> setter) => AddTextBox(header, getter, setter);
 	void IInspectorBuilder.AddNumber(string header, Func<float> getter, Action<float> setter) => AddNumber(header, getter, setter);
+	void IInspectorBuilder.AddToggle(string header, Func<bool> getter, Action<bool> setter) => AddToggle(header, getter, setter);
 	void IInspectorBuilder.AddColor(string header, Func<SKColor> getter, Action<SKColor> setter) => AddColor(header, getter, setter);
 	void IInspectorBuilder.AddFontBox(string header, Func<string> getter, Action<string> setter) => AddFontBox(header, getter, setter);
 	void IInspectorBuilder.AddSync(Action sync) => syncCallbacks.Add(sync);
@@ -248,6 +249,19 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 		AddRow(header, box);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
+	}
+
+	/// <summary>A switch that commits as soon as it is toggled. Only user clicks raise the switch's
+	/// click event, so the sync refreshes setting its state never record undo states.</summary>
+	private void AddToggle(string header, Func<bool> get, Action<bool> set)
+	{
+		var toggle = new ToggleSwitch();
+		void Refresh() => toggle.IsChecked = get();
+		Refresh();
+		toggle.Click += (_, _) => Apply(() => set(toggle.IsChecked == true));
+
+		AddRow(header, toggle);
+		syncCallbacks.Add(() => { if (!toggle.IsKeyboardFocusWithin) Refresh(); });
 	}
 
 	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch that opens the color picker dialog when pressed.</summary>

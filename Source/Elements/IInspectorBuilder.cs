@@ -22,6 +22,9 @@ public interface IInspectorBuilder
 	/// <summary>A numeric editor that commits on Enter or when it loses focus; invalid input is discarded.</summary>
 	void AddNumber(string header, Func<float> getter, Action<float> setter);
 
+	/// <summary>A switch that commits as soon as the user toggles it.</summary>
+	void AddToggle(string header, Func<bool> getter, Action<bool> setter);
+
 	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch of the current color.</summary>
 	void AddColor(string header, Func<SKColor> getter, Action<SKColor> setter);
 

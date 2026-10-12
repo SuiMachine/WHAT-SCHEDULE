@@ -88,6 +88,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddTextBox(string header, Func<string> getter, Action<string> setter) => AddTextBox(header, getter, setter);
 	void IInspectorBuilder.AddNumber(string header, Func<float> getter, Action<float> setter) => AddNumber(header, getter, setter);
 	void IInspectorBuilder.AddToggle(string header, Func<bool> getter, Action<bool> setter) => AddToggle(header, getter, setter);
+	void IInspectorBuilder.AddSlider(string header, float minimum, float maximum, Func<float> getter, Action<float> setter) => AddSlider(header, minimum, maximum, getter, setter);
 	void IInspectorBuilder.AddColor(string header, Func<SKColor> getter, Action<SKColor> setter) => AddColor(header, getter, setter);
 	void IInspectorBuilder.AddFontBox(string header, Func<string> getter, Action<string> setter) => AddFontBox(header, getter, setter);
 	void IInspectorBuilder.AddSync(Action sync) => syncCallbacks.Add(sync);
@@ -262,6 +263,91 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 		AddRow(header, toggle);
 		syncCallbacks.Add(() => { if (!toggle.IsKeyboardFocusWithin) Refresh(); });
+	}
+
+	/// <summary>A slider with an editable number beside it. The value is previewed live while it changes,
+	/// a whole pointer drag or a run of held keyboard steps commits as a single undo entry, and typing a
+	/// number commits like any other numeric editor: on Enter or focus loss, invalid input discarded.</summary>
+	private void AddSlider(string header, float minimum, float maximum, Func<float> get, Action<float> set)
+	{
+		var slider = new Slider
+		{
+			Minimum = minimum,
+			Maximum = maximum,
+			SmallChange = 1,
+			LargeChange = 10,
+			MinWidth = 60,
+			//The Fluent slider template is 50 tall, which would stretch the row and the
+			//text box with it; 32 matches the text box height so the row lines up with its neighbours.
+			//The template also draws its track in the middle of its natural 50px, so the negative
+			//top padding pulls the track up to the middle of the shrunk 32px control.
+			Height = 32,
+			Padding = new Thickness(0, -9, 0, 0),
+		};
+		var box = new TextBox { MinWidth = 48 };
+
+		var editor = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+		Grid.SetColumn(slider, 0);
+		Grid.SetColumn(box, 1);
+		editor.Children.Add(slider);
+		editor.Children.Add(box);
+
+		//Value changes that come from the sync refresh must not start a drag or commit anything.
+		var syncing = false;
+		var dragStart = default(CanvasElement.ElementState);
+		void CommitDrag()
+		{
+			if (dragStart is { } before && element is not null)
+				canvas?.Document?.RecordStateChange(element, before);
+			dragStart = null;
+		}
+
+		void Refresh()
+		{
+			syncing = true;
+			var current = get();
+			slider.Value = current;
+			box.Text = current.ToString("0.##", CultureInfo.InvariantCulture);
+			syncing = false;
+		}
+
+		void CommitTyped()
+		{
+			if (float.TryParse(box.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var typed))
+				Apply(() => set((float)Math.Clamp(typed, minimum, maximum)));
+			Refresh();
+		}
+
+		slider.ValueChanged += (_, _) =>
+		{
+			if (syncing)
+				return;
+
+			var current = (float)slider.Value;
+			if (!box.IsKeyboardFocusWithin)
+				box.Text = current.ToString("0.##", CultureInfo.InvariantCulture);
+			dragStart ??= element?.CaptureState();
+			set(current);
+			canvas?.Document?.RaiseChanged();
+		};
+		//A pointer drag ends when the thumb loses the pointer capture; a keyboard
+		//run ends when the held key is released. Either way, one undo entry per run.
+		slider.PointerCaptureLost += (_, _) => CommitDrag();
+		slider.KeyUp += (_, _) => CommitDrag();
+
+		box.LostFocus += (_, _) => CommitTyped();
+		box.KeyDown += (_, e) =>
+		{
+			if (e.Key != Key.Enter)
+				return;
+
+			CommitTyped();
+			e.Handled = true;
+		};
+
+		Refresh();
+		AddRow(header, editor);
+		syncCallbacks.Add(() => { if (!slider.IsKeyboardFocusWithin && !box.IsKeyboardFocusWithin) Refresh(); });
 	}
 
 	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch that opens the color picker dialog when pressed.</summary>

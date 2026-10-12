@@ -220,7 +220,7 @@ namespace WhatSchedule.Elements
 			builder.AddRow(string.Empty, resetCrop);
 
 			builder.AddSection("Appearance");
-			builder.AddNumber("Opacity %", () => Opacity * 100f, value => Opacity = (float)Math.Clamp(value, 0, 100) / 100f);
+			builder.AddSlider("Opacity %", 0, 100, () => Opacity * 100f, value => Opacity = (float)Math.Clamp(value, 0, 100) / 100f);
 			builder.AddNumber("Corner Radius", () => CornerRadius, value => CornerRadius = Math.Max(0, value));
 			builder.AddToggle("Flip Horizontal", () => FlipX, value => FlipX = value);
 			builder.AddToggle("Flip Vertical", () => FlipY, value => FlipY = value);

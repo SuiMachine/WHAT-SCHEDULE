@@ -25,6 +25,10 @@ public interface IInspectorBuilder
 	/// <summary>A switch that commits as soon as the user toggles it.</summary>
 	void AddToggle(string header, Func<bool> getter, Action<bool> setter);
 
+	/// <summary>A slider that previews the value live while dragged and commits the whole drag
+	/// as a single undo entry; keyboard steps commit each on their own.</summary>
+	void AddSlider(string header, float minimum, float maximum, Func<float> getter, Action<float> setter);
+
 	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch of the current color.</summary>
 	void AddColor(string header, Func<SKColor> getter, Action<SKColor> setter);
 

@@ -92,6 +92,8 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddSection(string title) => AddSection(title);
 	void IInspectorBuilder.AddRow(string header, Control editor) => AddRow(header, editor);
 	void IInspectorBuilder.AddTextBox(string header, Func<string> getter, Action<string> setter) => AddTextBox(header, getter, setter);
+	void IInspectorBuilder.AddTextArea(string header, Func<string> getter, Action<string> setter) => AddTextArea(header, getter, setter);
+	void IInspectorBuilder.AddComboBox(string header, string[] items, Func<string> getter, Action<string> setter) => AddComboBox(header, items, getter, setter);
 	void IInspectorBuilder.AddNumber(string header, Func<float> getter, Action<float> setter) => AddNumber(header, getter, setter);
 	void IInspectorBuilder.AddToggle(string header, Func<bool> getter, Action<bool> setter) => AddToggle(header, getter, setter);
 	void IInspectorBuilder.AddSlider(string header, float minimum, float maximum, Func<float> getter, Action<float> setter) => AddSlider(header, minimum, maximum, getter, setter);
@@ -296,6 +298,62 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 		AddRow(header, box);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
+	}
+
+	/// <summary>A multi-line text editor that commits when it loses focus; Enter adds a line break and empty
+	/// input is discarded, because an element with no text could never be picked again on the canvas.</summary>
+	private void AddTextArea(string header, Func<string> get, Action<string> set)
+	{
+		var box = new TextBox
+		{
+			AcceptsReturn = true,
+			TextWrapping = TextWrapping.Wrap,
+			MinHeight = 64,
+			MaxHeight = 140,
+			VerticalContentAlignment = VerticalAlignment.Top,
+		};
+		void Refresh() => box.Text = get();
+		void Commit()
+		{
+			var text = box.Text ?? string.Empty;
+			if (string.IsNullOrWhiteSpace(text))
+			{
+				Refresh();
+				return;
+			}
+
+			//The TextBox inserts Windows line breaks; the label's text is stored with plain ones.
+			Apply(() => set(text.Replace("\r\n", "\n")));
+			Refresh();
+		}
+
+		Refresh();
+		box.LostFocus += (_, _) => Commit();
+
+		AddRow(header, box);
+		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
+	}
+
+	/// <summary>A combo box of the given items that commits as soon as the selection changes; only user interaction raises the changed event, so the sync refresh never records undo states.</summary>
+	private void AddComboBox(string header, string[] items, Func<string> get, Action<string> set)
+	{
+		var combo = new ComboBox { ItemsSource = items, SelectedItem = get() };
+		combo.SelectionChanged += (_, _) =>
+		{
+			if (combo.SelectedItem is string value && !string.Equals(value, get(), StringComparison.Ordinal))
+				Apply(() => set(value));
+		};
+
+		AddRow(header, combo);
+		syncCallbacks.Add(() =>
+		{
+			if (combo.IsKeyboardFocusWithin)
+				return;
+
+			var current = get();
+			if (!string.Equals(combo.SelectedItem as string, current, StringComparison.Ordinal))
+				combo.SelectedItem = items.FirstOrDefault(item => string.Equals(item, current, StringComparison.Ordinal)) ?? combo.SelectedItem;
+		});
 	}
 
 	/// <summary>A numeric editor with spin buttons. The value is previewed live while it changes and a whole

@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SkiaSharp;
 using WhatSchedule.Elements;
+using WhatSchedule.Rendering.Definitions;
 
 namespace WhatSchedule.Documents
 {
@@ -70,14 +71,35 @@ namespace WhatSchedule.Documents
 				Rotation = label.Rotation,
 				Text = label.Text,
 				FontFamily = label.FontFamily,
+				FontWeight = label.FontStyle.Weight,
+				FontSlant = (int)label.FontStyle.Slant,
 				FontSize = label.FontSize,
+				LetterSpacing = label.LetterSpacing,
+				Stretch = label.Stretch,
+				Skew = label.Skew,
+				LineHeight = label.LineHeight,
+				Alignment = label.Alignment.ToString(),
+				Transform = label.Transform.ToString(),
 				TextColor = ToData(label.TextColor),
+				Opacity = label.Opacity,
+				GradientFill = label.GradientFill,
+				GradientColor = ToData(label.GradientColor),
+				GradientAngle = label.GradientAngle,
 				OutlineColor = ToData(label.OutlineColor),
 				OutlineWidth = label.OutlineWidth,
+				OutlinePosition = label.OutlinePosition.ToString(),
+				SecondOutlineColor = ToData(label.SecondOutlineColor),
+				SecondOutlineWidth = label.SecondOutlineWidth,
 				ShadowColor = ToData(label.ShadowColor),
 				ShadowBlur = label.ShadowBlur,
 				ShadowOffset = ToData(label.ShadowOffset),
-				BlendMode = label.BlendMode.ToString()
+				ShadowBlendMode = label.ShadowBlendMode.ToString(),
+				GlowColor = ToData(label.GlowColor),
+				GlowBlur = label.GlowBlur,
+				Blur = label.Blur,
+				BlendMode = label.BlendMode.ToString(),
+				FlipX = label.FlipX,
+				FlipY = label.FlipY
 			},
 			ImageElement image => new ImageElement.ImageElementData
 			{
@@ -112,21 +134,44 @@ namespace WhatSchedule.Documents
 			switch (data)
 			{
 				case LabelElement.LabelElementData label:
-					element = new LabelElement
 					{
-						Position = ToSKPoint(position),
-						Text = label.Text,
-						FontFamily = label.FontFamily,
-						FontSize = label.FontSize,
-						TextColor = ToSKColor(label.TextColor, SKColors.White),
-						OutlineColor = ToSKColor(label.OutlineColor, SKColors.Black),
-						OutlineWidth = label.OutlineWidth,
-						ShadowColor = ToSKColor(label.ShadowColor, SKColors.Black.WithAlpha(140)),
-						ShadowBlur = label.ShadowBlur,
-						ShadowOffset = label.ShadowOffset is { } shadowOffset ? ToSKPoint(shadowOffset) : new SKPoint(3f, 3f),
-						BlendMode = Enum.TryParse(label.BlendMode, out SKBlendMode blendMode) ? blendMode : SKBlendMode.SrcOver
-					};
-					break;
+						element = new LabelElement
+						{
+							Position = ToSKPoint(position),
+							Text = label.Text,
+							FontFamily = label.FontFamily,
+							//Skia's width has no named constant for normal, and the renderer only ever needs the weight and slant.
+							FontStyle = new SKFontStyle(label.FontWeight ?? 400, 5, (SKFontStyleSlant)(label.FontSlant ?? 0)),
+							FontSize = label.FontSize,
+							LetterSpacing = label.LetterSpacing ?? 0f,
+							Stretch = label.Stretch ?? 100f,
+							Skew = label.Skew ?? 0f,
+							LineHeight = label.LineHeight ?? 1f,
+							Alignment = Enum.TryParse(label.Alignment, out TextAlignment alignment) ? alignment : TextAlignment.Left,
+							Transform = Enum.TryParse(label.Transform, out TextTransform transform) ? transform : TextTransform.None,
+							TextColor = ToSKColor(label.TextColor, SKColors.White),
+							Opacity = label.Opacity ?? 1f,
+							GradientFill = label.GradientFill ?? false,
+							GradientColor = ToSKColor(label.GradientColor, SKColors.White),
+							GradientAngle = label.GradientAngle ?? 0f,
+							OutlineColor = ToSKColor(label.OutlineColor, SKColors.Black),
+							OutlineWidth = label.OutlineWidth,
+							OutlinePosition = Enum.TryParse(label.OutlinePosition, out OutlinePosition outlinePosition) ? outlinePosition : OutlinePosition.Center,
+							SecondOutlineColor = ToSKColor(label.SecondOutlineColor, SKColors.White),
+							SecondOutlineWidth = label.SecondOutlineWidth ?? 0f,
+							ShadowColor = ToSKColor(label.ShadowColor, SKColors.Black.WithAlpha(140)),
+							ShadowBlur = label.ShadowBlur,
+							ShadowOffset = label.ShadowOffset is { } shadowOffset ? ToSKPoint(shadowOffset) : new SKPoint(3f, 3f),
+							ShadowBlendMode = Enum.TryParse(label.ShadowBlendMode, out SKBlendMode shadowBlendMode) ? shadowBlendMode : SKBlendMode.SrcOver,
+							GlowColor = ToSKColor(label.GlowColor, SKColors.Transparent),
+							GlowBlur = label.GlowBlur ?? 0f,
+							Blur = label.Blur ?? 0f,
+							BlendMode = Enum.TryParse(label.BlendMode, out SKBlendMode blendMode) ? blendMode : SKBlendMode.SrcOver,
+							FlipX = label.FlipX ?? false,
+							FlipY = label.FlipY ?? false
+						};
+						break;
+					}
 				case ImageElement.ImageElementData image:
 					{
 						var bitmap = image.Png is null ? null : SKBitmap.Decode(Convert.FromBase64String(image.Png));

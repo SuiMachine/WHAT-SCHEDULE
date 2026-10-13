@@ -298,24 +298,44 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
 	}
 
-	/// <summary>A numeric editor that commits on Enter or when it loses focus; invalid input is discarded.</summary>
+	/// <summary>A numeric editor with spin buttons. The value is previewed live while it changes and a whole
+	/// edit run (typing, a pointer drag on a spin button, or a run of held keyboard steps) commits as a
+	/// single undo entry when the run ends on Enter or focus loss; input the control cannot parse is discarded.</summary>
 	private void AddNumber(string header, Func<float> get, Action<float> set)
 	{
-		var box = new TextBox();
-		void Refresh() => box.Text = get().ToString("0.##", CultureInfo.InvariantCulture);
-		void Commit()
+		var box = new NumericUpDown
 		{
-			if (!float.TryParse(box.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
-			{
-				Refresh();
-				return;
-			}
+			FormatString = "0.##",
+			NumberFormat = CultureInfo.InvariantCulture.NumberFormat,
+		};
 
-			Apply(() => set(value));
-			Refresh();
+		//Value changes that come from the sync refresh must not start an edit or commit anything.
+		var syncing = false;
+		var editStart = default(CanvasElement.ElementState);
+
+		void Refresh()
+		{
+			syncing = true;
+			box.Value = (decimal)get();
+			syncing = false;
 		}
 
-		Refresh();
+		void Commit()
+		{
+			if (editStart is { } before && element is not null)
+				canvas?.Document?.RecordStateChange(element, before);
+			editStart = null;
+		}
+
+		box.ValueChanged += (_, _) =>
+		{
+			if (syncing || box.Value is not { } value)
+				return;
+
+			editStart ??= element?.CaptureState();
+			set((float)value);
+			canvas?.Document?.RaiseChanged();
+		};
 		box.LostFocus += (_, _) => Commit();
 		box.KeyDown += (_, e) =>
 		{
@@ -326,6 +346,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			e.Handled = true;
 		};
 
+		Refresh();
 		AddRow(header, box);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
 	}

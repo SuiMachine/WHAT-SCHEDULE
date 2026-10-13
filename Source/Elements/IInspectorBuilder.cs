@@ -19,7 +19,8 @@ public interface IInspectorBuilder
 	/// <summary>A text editor that commits on Enter or when it loses focus; empty input is discarded.</summary>
 	void AddTextBox(string header, Func<string> getter, Action<string> setter);
 
-	/// <summary>A numeric editor that commits on Enter or when it loses focus; invalid input is discarded.</summary>
+	/// <summary>A numeric editor with spin buttons that previews the value live while it changes and
+	/// commits a whole edit run as a single undo entry; invalid input is discarded.</summary>
 	void AddNumber(string header, Func<float> getter, Action<float> setter);
 
 	/// <summary>A switch that commits as soon as the user toggles it.</summary>

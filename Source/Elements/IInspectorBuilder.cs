@@ -10,7 +10,7 @@ namespace WhatSchedule.Elements;
 /// </summary>
 public interface IInspectorBuilder
 {
-	/// <summary>Adds a section header above the rows that follow it.</summary>
+	/// <summary>Adds a collapsible section header above the rows that follow it; collapsed sections hide their rows until expanded again.</summary>
 	void AddSection(string title);
 
 	/// <summary>Adds a custom editor, or any other control, in the right-hand column.</summary>

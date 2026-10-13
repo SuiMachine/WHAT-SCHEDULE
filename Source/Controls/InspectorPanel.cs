@@ -26,6 +26,12 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	private CanvasElement? element;
 	private Grid rows = null!;
 
+	/// <summary>Titles of the sections the user collapsed, kept across rebuilds so the choice sticks when the selection changes.</summary>
+	private readonly HashSet<string> collapsedSections = new(StringComparer.Ordinal);
+
+	/// <summary>The editors of the section being built, hidden while its header is collapsed.</summary>
+	private List<Control> sectionControls = new();
+
 	/// <summary>The font families installed on the machine, cached for the font combo boxes.</summary>
 	private static string[] FontFamilies => fontFamilies ??= SKFontManager.Default.GetFontFamilies()
 		.Distinct(StringComparer.OrdinalIgnoreCase)
@@ -162,9 +168,78 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 	private void AddSection(string title)
 	{
+		var controls = new List<Control>();
+		sectionControls = controls;
+
 		rows.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
 		var row = rows.RowDefinitions.Count - 1;
-		var header = new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 10, 0, 2) };
+
+		var arrow = new Avalonia.Controls.Shapes.Path
+		{
+			Width = 8,
+			Height = 8,
+			Stretch = Stretch.Uniform,
+			StrokeThickness = 1.5,
+			Stroke = ThemeDefinition.RulerLabel,
+			Margin = new Thickness(1, 0, 5, 0),
+		};
+		//A themed button would repaint itself through its checked and pressed states, so the
+		//header is a plain panel that paints its own hover highlight: same look in both states.
+		var header = new Border
+		{
+			Background = Brushes.Transparent,
+			Margin = new Thickness(0, 10, 0, 2),
+			Cursor = new Cursor(StandardCursorType.Hand),
+			Focusable = true,
+			Child = new StackPanel
+			{
+				Orientation = Orientation.Horizontal,
+				Children =
+				{
+					arrow,
+					new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center },
+				},
+			},
+		};
+
+		var expanded = !collapsedSections.Contains(title);
+		void SetExpanded(bool value)
+		{
+			expanded = value;
+			arrow.Data = Geometry.Parse(value ? "M0,2 L4.5,6 L9,2" : "M2,0 L6,4.5 L2,9");
+			foreach (var control in controls)
+				control.IsVisible = value;
+		}
+
+		void Toggle()
+		{
+			SetExpanded(!expanded);
+			if (expanded)
+				collapsedSections.Remove(title);
+			else
+				collapsedSections.Add(title);
+		}
+
+		SetExpanded(expanded);
+		header.PointerPressed += (_, e) =>
+		{
+			if (!e.GetCurrentPoint(header).Properties.IsLeftButtonPressed)
+				return;
+
+			Toggle();
+			e.Handled = true;
+		};
+		header.KeyDown += (_, e) =>
+		{
+			if (e.Key is not (Key.Space or Key.Enter))
+				return;
+
+			Toggle();
+			e.Handled = true;
+		};
+		header.PointerEntered += (_, _) => header.Background = ThemeDefinition.RulerBackground;
+		header.PointerExited += (_, _) => header.Background = Brushes.Transparent;
+
 		Grid.SetRow(header, row);
 		Grid.SetColumnSpan(header, 2);
 		rows.Children.Add(header);
@@ -184,6 +259,9 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		Grid.SetRow(editor, row);
 		Grid.SetColumn(editor, 1);
 		rows.Children.Add(editor);
+
+		sectionControls.Add(label);
+		sectionControls.Add(editor);
 	}
 
 	/// <summary>A text editor that commits on Enter or when it loses focus; empty input is discarded.</summary>

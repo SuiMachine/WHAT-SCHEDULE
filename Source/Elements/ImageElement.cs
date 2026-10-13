@@ -13,6 +13,27 @@ namespace WhatSchedule.Elements
 			IsAntialias = true,
 		};
 
+		/// <summary>The blend modes offered for tinting; a curated subset of SKBlendMode rather than all of them.</summary>
+		private static readonly SKBlendMode[] TintModes =
+		{
+			SKBlendMode.SrcIn,
+			SKBlendMode.Multiply,
+			SKBlendMode.Screen,
+			SKBlendMode.Overlay,
+			SKBlendMode.SoftLight,
+			SKBlendMode.HardLight,
+			SKBlendMode.Plus,
+		};
+
+		/// <summary>The blend modes offered for compositing the image onto the canvas; a curated subset of SKBlendMode rather than all of them.</summary>
+		private static readonly string[] BlendModes =
+		{
+			SKBlendMode.SrcOver.ToString(), SKBlendMode.Multiply.ToString(), SKBlendMode.Screen.ToString(), SKBlendMode.Overlay.ToString(),
+			SKBlendMode.Darken.ToString(), SKBlendMode.Lighten.ToString(), SKBlendMode.HardLight.ToString(), SKBlendMode.SoftLight.ToString(),
+			SKBlendMode.Difference.ToString(), SKBlendMode.Exclusion.ToString(), SKBlendMode.Hue.ToString(), SKBlendMode.Saturation.ToString(),
+			SKBlendMode.Color.ToString(), SKBlendMode.Luminosity.ToString(), SKBlendMode.Plus.ToString(),
+		};
+
 		public SKBitmap Bitmap { get; }
 
 		public float Width { get; set; }
@@ -54,6 +75,9 @@ namespace WhatSchedule.Elements
 
 		/// <summary>How the tint color is combined with the image.</summary>
 		public SKBlendMode TintMode { get; set; } = SKBlendMode.SrcIn;
+
+		/// <summary>How the image is composited onto the content below it on the canvas.</summary>
+		public SKBlendMode BlendMode { get; set; } = SKBlendMode.SrcOver;
 
 		public ImageElement(SKBitmap bitmap, SKPoint position)
 		{
@@ -132,7 +156,7 @@ namespace WhatSchedule.Elements
 				canvas.ClipPath(clip, SKClipOperation.Intersect, true);
 			}
 
-			BitmapPaint.BlendMode = SKBlendMode.SrcOver;
+			BitmapPaint.BlendMode = BlendMode;
 			BitmapPaint.Color = SKColors.White.WithAlpha((byte)Math.Round(Math.Clamp(Opacity, 0f, 1f) * 255));
 			canvas.DrawBitmap(Bitmap, Crop, bounds, BitmapPaint);
 
@@ -160,7 +184,7 @@ namespace WhatSchedule.Elements
 			return new SKRect(left, top, right, bottom);
 		}
 
-		public override ElementState CaptureState() => new ImageElementState(Position, Rotation, Width, Height, Crop, Opacity, CornerRadius, FlipX, FlipY, ShadowColor, ShadowBlur, ShadowOffset, TintColor, TintMode);
+		public override ElementState CaptureState() => new ImageElementState(Position, Rotation, Width, Height, Crop, Opacity, CornerRadius, FlipX, FlipY, ShadowColor, ShadowBlur, ShadowOffset, TintColor, TintMode, BlendMode);
 
 		public override void RestoreState(ElementState state)
 		{
@@ -181,6 +205,7 @@ namespace WhatSchedule.Elements
 			ShadowOffset = snapshot.ShadowOffset;
 			TintColor = snapshot.TintColor;
 			TintMode = snapshot.TintMode;
+			BlendMode = snapshot.BlendMode;
 		}
 
 		public override void BuildInspectorRows(IInspectorBuilder builder)
@@ -220,6 +245,7 @@ namespace WhatSchedule.Elements
 			builder.AddRow(string.Empty, resetCrop);
 
 			builder.AddSection("Appearance");
+			builder.AddComboBox("Blend Mode", BlendModes, () => BlendMode.ToString(), value => BlendMode = Enum.Parse<SKBlendMode>(value));
 			builder.AddSlider("Opacity %", 0, 100, () => Opacity * 100f, value => Opacity = (float)Math.Clamp(value, 0, 100) / 100f);
 			builder.AddNumber("Corner Radius", () => CornerRadius, value => CornerRadius = Math.Max(0, value));
 			builder.AddToggle("Flip Horizontal", () => FlipX, value => FlipX = value);
@@ -234,25 +260,12 @@ namespace WhatSchedule.Elements
 			builder.AddSection("Tint");
 			builder.AddColor("Color", () => TintColor, value => TintColor = value);
 
-			var modes = new[] { SKBlendMode.SrcIn, SKBlendMode.Multiply, SKBlendMode.Screen, SKBlendMode.Overlay, SKBlendMode.SoftLight, SKBlendMode.HardLight, SKBlendMode.Plus };
-			var modeBox = new ComboBox { ItemsSource = modes.Select(mode => mode.ToString()).ToArray(), SelectedItem = TintMode.ToString() };
-			modeBox.SelectionChanged += (_, _) =>
-			{
-				if (modeBox.SelectedItem is string name && Enum.TryParse(name, out SKBlendMode mode) && mode != TintMode)
-					builder.Apply(() => TintMode = mode);
-			};
-			builder.AddRow("Mode", modeBox);
-			builder.AddSync(() =>
-			{
-				var current = TintMode.ToString();
-				if (modeBox.SelectedItem as string != current)
-					modeBox.SelectedItem = current;
-			});
+			builder.AddComboBox("Mode", TintModes.Select(mode => mode.ToString()).ToArray(), () => TintMode.ToString(), value => TintMode = Enum.Parse<SKBlendMode>(value));
 		}
 
 		private sealed record ImageScaleState(float Width, float Height) : ScaleState;
 
-		public sealed record ImageElementState(SKPoint Position, float Rotation, float Width, float Height, SKRect Crop, float Opacity, float CornerRadius, bool FlipX, bool FlipY, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset, SKColor TintColor, SKBlendMode TintMode) : ElementState;
+		public sealed record ImageElementState(SKPoint Position, float Rotation, float Width, float Height, SKRect Crop, float Opacity, float CornerRadius, bool FlipX, bool FlipY, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset, SKColor TintColor, SKBlendMode TintMode, SKBlendMode BlendMode) : ElementState;
 
 		public sealed class ImageElementData : ElementData
 		{
@@ -292,6 +305,9 @@ namespace WhatSchedule.Elements
 			public string? TintColor { get; set; }
 
 			public string? TintMode { get; set; }
+
+			/// <summary>How the image is composited onto the canvas; null in documents saved before image blend modes existed.</summary>
+			public string? BlendMode { get; set; }
 		}
 	}
 }

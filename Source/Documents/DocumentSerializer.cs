@@ -120,7 +120,8 @@ namespace WhatSchedule.Documents
 				ShadowBlur = image.ShadowBlur,
 				ShadowOffset = ToData(image.ShadowOffset),
 				TintColor = ToData(image.TintColor),
-				TintMode = image.TintMode.ToString()
+				TintMode = image.TintMode.ToString(),
+				BlendMode = image.BlendMode.ToString()
 			},
 			_ => throw new NotSupportedException($"Cannot save {element.GetType().Name} elements.")
 		};
@@ -190,7 +191,8 @@ namespace WhatSchedule.Documents
 							ShadowBlur = image.ShadowBlur ?? 6f,
 							ShadowOffset = image.ShadowOffset is { } imageShadowOffset ? ToSKPoint(imageShadowOffset) : new SKPoint(3f, 3f),
 							TintColor = ToSKColor(image.TintColor, SKColor.Empty),
-							TintMode = Enum.TryParse(image.TintMode, out SKBlendMode tintMode) ? tintMode : SKBlendMode.SrcIn
+							TintMode = Enum.TryParse(image.TintMode, out SKBlendMode tintMode) ? tintMode : SKBlendMode.SrcIn,
+							BlendMode = Enum.TryParse(image.BlendMode, out SKBlendMode imageBlendMode) ? imageBlendMode : SKBlendMode.SrcOver
 						};
 						if (image.CropX is { } cropX && image.CropY is { } cropY && image.CropWidth is { } cropWidth && image.CropHeight is { } cropHeight)
 							restored.Crop = SKRect.Create(cropX, cropY, cropWidth, cropHeight);

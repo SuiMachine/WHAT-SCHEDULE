@@ -76,7 +76,8 @@ namespace WhatSchedule.Documents
 				OutlineWidth = label.OutlineWidth,
 				ShadowColor = ToData(label.ShadowColor),
 				ShadowBlur = label.ShadowBlur,
-				ShadowOffset = ToData(label.ShadowOffset)
+				ShadowOffset = ToData(label.ShadowOffset),
+				BlendMode = label.BlendMode.ToString()
 			},
 			ImageElement image => new ImageElement.ImageElementData
 			{
@@ -122,7 +123,8 @@ namespace WhatSchedule.Documents
 						OutlineWidth = label.OutlineWidth,
 						ShadowColor = ToSKColor(label.ShadowColor, SKColors.Black.WithAlpha(140)),
 						ShadowBlur = label.ShadowBlur,
-						ShadowOffset = label.ShadowOffset is { } shadowOffset ? ToSKPoint(shadowOffset) : new SKPoint(3f, 3f)
+						ShadowOffset = label.ShadowOffset is { } shadowOffset ? ToSKPoint(shadowOffset) : new SKPoint(3f, 3f),
+						BlendMode = Enum.TryParse(label.BlendMode, out SKBlendMode blendMode) ? blendMode : SKBlendMode.SrcOver
 					};
 					break;
 				case ImageElement.ImageElementData image:

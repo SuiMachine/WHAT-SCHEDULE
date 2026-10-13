@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Avalonia.Input;
 using SkiaSharp;
 using WhatSchedule.Rendering.Definitions;
@@ -27,6 +28,9 @@ public sealed class LabelElement : CanvasElement
 	public float ShadowBlur { get; set; } = 6f;
 
 	public SKPoint ShadowOffset { get; set; } = new(3f, 3f);
+
+	/// <summary>How the whole label composites onto the background.</summary>
+	public SKBlendMode BlendMode { get; set; } = SKBlendMode.SrcOver;
 
 	public override SKSize Size => ImageTextRenderer.Measure(BuildOptions(SKPoint.Empty));
 
@@ -63,7 +67,7 @@ public sealed class LabelElement : CanvasElement
 			anchor.Y <= cursor.Y ? anchor.Y : anchor.Y - size.Height);
 	}
 
-	public override ElementState CaptureState() => new LabelElementState(Position, Rotation, Text, FontFamily, FontSize, TextColor, OutlineColor, OutlineWidth, ShadowColor, ShadowBlur, ShadowOffset);
+	public override ElementState CaptureState() => new LabelElementState(Position, Rotation, Text, FontFamily, FontSize, TextColor, OutlineColor, OutlineWidth, ShadowColor, ShadowBlur, ShadowOffset, BlendMode);
 
 	public override void BuildInspectorRows(IInspectorBuilder builder)
 	{
@@ -83,6 +87,23 @@ public sealed class LabelElement : CanvasElement
 		builder.AddNumber("Blur", () => ShadowBlur, value => ShadowBlur = Math.Max(0, value));
 		builder.AddNumber("Offset X", () => ShadowOffset.X, value => ShadowOffset = new SKPoint(value, ShadowOffset.Y));
 		builder.AddNumber("Offset Y", () => ShadowOffset.Y, value => ShadowOffset = new SKPoint(ShadowOffset.X, value));
+
+		builder.AddSection("Appearance");
+
+		var modes = new[] { SKBlendMode.SrcOver, SKBlendMode.Multiply, SKBlendMode.Screen, SKBlendMode.Overlay, SKBlendMode.Darken, SKBlendMode.Lighten, SKBlendMode.HardLight, SKBlendMode.SoftLight, SKBlendMode.Difference, SKBlendMode.Exclusion, SKBlendMode.Hue, SKBlendMode.Saturation, SKBlendMode.Color, SKBlendMode.Luminosity, SKBlendMode.Plus };
+		var modeBox = new ComboBox { ItemsSource = modes.Select(mode => mode.ToString()).ToArray(), SelectedItem = BlendMode.ToString() };
+		modeBox.SelectionChanged += (_, _) =>
+		{
+			if (modeBox.SelectedItem is string name && Enum.TryParse(name, out SKBlendMode mode) && mode != BlendMode)
+				builder.Apply(() => BlendMode = mode);
+		};
+		builder.AddRow("Blend Mode", modeBox);
+		builder.AddSync(() =>
+		{
+			var current = BlendMode.ToString();
+			if (modeBox.SelectedItem as string != current)
+				modeBox.SelectedItem = current;
+		});
 	}
 
 	public override void RestoreState(ElementState state)
@@ -101,11 +122,12 @@ public sealed class LabelElement : CanvasElement
 		ShadowColor = snapshot.ShadowColor;
 		ShadowBlur = snapshot.ShadowBlur;
 		ShadowOffset = snapshot.ShadowOffset;
+		BlendMode = snapshot.BlendMode;
 	}
 
 	private sealed record LabelScaleState(float Width, float FontSize, float OutlineWidth, float ShadowBlur, SKPoint ShadowOffset) : ScaleState;
 
-	public sealed record LabelElementState(SKPoint Position, float Rotation, string Text, string FontFamily, float FontSize, SKColor TextColor, SKColor OutlineColor, float OutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset) : ElementState;
+	public sealed record LabelElementState(SKPoint Position, float Rotation, string Text, string FontFamily, float FontSize, SKColor TextColor, SKColor OutlineColor, float OutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset, SKBlendMode BlendMode) : ElementState;
 
 	private TextOverlayOptions BuildOptions(SKPoint position) => new()
 	{
@@ -118,6 +140,7 @@ public sealed class LabelElement : CanvasElement
 		ShadowColor = ShadowColor,
 		ShadowBlur = ShadowBlur,
 		ShadowOffset = ShadowOffset,
+		BlendMode = BlendMode,
 		Position = position,
 	};
 
@@ -144,5 +167,8 @@ public sealed class LabelElement : CanvasElement
 		public float ShadowBlur { get; set; } = 6f;
 
 		public PointData? ShadowOffset { get; set; }
+
+		/// <summary>The label's blend mode as its name; null in documents saved before blend modes existed.</summary>
+		public string? BlendMode { get; set; }
 	}
 }

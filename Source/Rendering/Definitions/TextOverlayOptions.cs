@@ -22,6 +22,9 @@ public sealed record TextOverlayOptions
 
 	public SKPoint ShadowOffset { get; init; } = new(3, 3);
 
+	/// <summary>How the whole text block composites onto what is already on the canvas.</summary>
+	public SKBlendMode BlendMode { get; init; } = SKBlendMode.SrcOver;
+
 	/// <summary>Top-left corner of the text block, in image/document pixels.</summary>
 	public SKPoint Position { get; init; } = new(20, 20);
 }

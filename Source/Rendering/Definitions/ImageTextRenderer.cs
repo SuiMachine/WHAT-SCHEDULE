@@ -36,9 +36,17 @@ public static class ImageTextRenderer
 		using var font = CreateFont(options);
 		var baseline = new SKPoint(options.Position.X, options.Position.Y - font.Metrics.Ascent);
 
+		//A blend mode other than SrcOver must composite the whole label (shadow, outline, fill)
+		//as one group, so it draws through a layer whose paint carries the mode.
+		using var blendPaint = options.BlendMode == SKBlendMode.SrcOver ? null : new SKPaint { BlendMode = options.BlendMode };
+		var layer = blendPaint is null ? 0 : canvas.SaveLayer(blendPaint);
+
 		DrawShadow(canvas, options, font, baseline);
 		DrawOutline(canvas, options, font, baseline);
 		DrawFill(canvas, options, font, baseline);
+
+		if (blendPaint is not null)
+			canvas.RestoreToCount(layer);
 	}
 
 	/// <summary>
@@ -75,7 +83,16 @@ public static class ImageTextRenderer
 
 		return new SKFont(typeface, options.FontSize)
 		{
-			Edging = SKFontEdging.Antialias,
+			Edging = SKFontEdging.SubpixelAntialias,
+			//Skia applies hinting, baseline snapping and whole-pixel glyph positions only while
+			//the text matrix is axis-aligned, so at 0 degrees the glyph advances were quantized
+			//to the pixel grid and at every other angle they were not, making the characters
+			//shift a little as the label rotates. Linear, unsnapped, subpixel metrics are the
+			//same at every angle, which keeps the rotation rigid.
+			Hinting = SKFontHinting.None,
+			BaselineSnap = false,
+			LinearMetrics = true,
+			Subpixel = true,
 		};
 	}
 

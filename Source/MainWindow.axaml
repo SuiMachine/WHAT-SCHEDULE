@@ -81,6 +81,15 @@
 					</NativeMenu>
 				</NativeMenuItem.Menu>
 			</NativeMenuItem>
+			<!--Added elements land in the top left corner, since a menu click carries no canvas position.-->
+			<NativeMenuItem Header="Add...">
+				<NativeMenuItem.Menu>
+					<NativeMenu>
+						<NativeMenuItem Header="Label..." Click="OnAddLabelClick" />
+						<NativeMenuItem Header="Image..." Click="OnAddImageClick" />
+					</NativeMenu>
+				</NativeMenuItem.Menu>
+			</NativeMenuItem>
 		</NativeMenu>
 	</NativeMenu.Menu>
 

@@ -145,7 +145,7 @@ internal sealed class CanvasMenus
 			document.ReorderTracked(element, offset);
 	}
 
-	private async Task AddLabelAsync(SKPoint position)
+	public async Task AddLabelAsync(SKPoint position)
 	{
 		var document = canvas.Document;
 		if (document is null || document.Width <= 0 || document.Height <= 0)
@@ -165,7 +165,7 @@ internal sealed class CanvasMenus
 		canvas.InvalidateVisual();
 	}
 
-	private async Task AddImageAsync(SKPoint position)
+	public async Task AddImageAsync(SKPoint position)
 	{
 		var document = canvas.Document;
 		if (document is null || document.Width <= 0 || document.Height <= 0)

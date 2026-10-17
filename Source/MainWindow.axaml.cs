@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using SkiaSharp;
 using WhatSchedule.Controls.Dialogs;
 using WhatSchedule.ViewModels;
 
@@ -78,4 +79,10 @@ public partial class MainWindow : Window
 	}
 
 	private void OnExitClick(object? sender, EventArgs e) => Close();
+
+	//Added elements land in the top left corner of the document, since a menu click carries no canvas position.
+
+	private async void OnAddLabelClick(object? sender, EventArgs e) => await Canvas.Menus.AddLabelAsync(new SKPoint(0, 0));
+
+	private async void OnAddImageClick(object? sender, EventArgs e) => await Canvas.Menus.AddImageAsync(new SKPoint(0, 0));
 }

@@ -24,8 +24,18 @@ public partial class MainWindowViewModel : ObservableObject
 	public Document Document
 	{
 		get => document;
-		private set => SetProperty(ref document, value);
+		private set
+		{
+			if (document is not null)
+				document.History.Changed -= RefreshHistoryCommands;
+			SetProperty(ref document, value);
+			document.History.Changed += RefreshHistoryCommands;
+			RefreshHistoryCommands();
+		}
 	}
+
+	/// <summary>Whether any changes are recorded in the history and would be lost by closing or replacing the document.</summary>
+	public bool HasHistoryChanges => Document.History.CanUndo || Document.History.CanRedo;
 
 	/// <summary>Set by the main window so commands can open file pickers.</summary>
 	public IStorageProvider? StorageProvider { get; set; }
@@ -128,6 +138,23 @@ public partial class MainWindowViewModel : ObservableObject
 		var png = DocumentRenderer.EncodePng(Document);
 		await using var stream = await file.OpenWriteAsync();
 		await stream.WriteAsync(png);
+	}
+
+	private bool CanUndo() => Document.History.CanUndo;
+
+	[RelayCommand]
+	private void Undo() => Document.History.Undo(Document);
+
+	private bool CanRedo() => Document.History.CanRedo;
+
+	[RelayCommand]
+	private void Redo() => Document.History.Redo(Document);
+
+	/// <summary>Re-evaluates whether undo and redo can run after the history or the document itself changed.</summary>
+	private void RefreshHistoryCommands()
+	{
+		UndoCommand.NotifyCanExecuteChanged();
+		RedoCommand.NotifyCanExecuteChanged();
 	}
 
 	private Document CreateSampleDocument()

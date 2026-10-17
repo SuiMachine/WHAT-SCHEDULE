@@ -13,30 +13,62 @@
 		<vm:MainWindowViewModel />
 	</Design.DataContext>
 
-	<Grid RowDefinitions="Auto,Auto,*" Margin="4" Background="{x:Static app:ThemeDefinition.Background}">
-		<Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,*" Margin="0,0,0,12">
-			<Button Grid.Column="0" Content="New" Margin="8,0,0,0" Command="{Binding NewScheduleCommand}" />
-			<Button Grid.Column="1" Content="Load..." Margin="8,0,0,0" Command="{Binding LoadCommand}" />
-			<Button Grid.Column="2" Content="Save..." Margin="8,0,0,0" Command="{Binding SaveCommand}" />
-			<Button Grid.Column="3" Content="Export..." Margin="8,0,0,0" Command="{Binding ExportCommand}" />
-		</Grid>
+	<Window.KeyBindings>
+		<!--NativeMenuItem.Gesture only labels the menu entry; these make the shortcuts actually fire.-->
+		<KeyBinding Gesture="Ctrl+O" Command="{Binding LoadCommand}" />
+		<KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
+		<KeyBinding Gesture="Ctrl+E" Command="{Binding ExportCommand}" />
+		<!--The canvas handles these itself when it has focus and marks them handled; these cover the rest of the window.-->
+		<KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+		<KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+	</Window.KeyBindings>
 
-		<Grid Grid.Row="2">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="*" MinWidth="100" />
-				<ColumnDefinition Width="Auto" />
-				<ColumnDefinition Width="280" MinWidth="200" />
-			</Grid.ColumnDefinitions>
-			<Border Grid.Column="0" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
-				<controls:PreviewCanvas x:Name="Canvas" Document="{Binding Document}" />
-			</Border>
-			<GridSplitter Grid.Column="1" Width="6" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Background="Transparent" />
-			<Border Grid.Column="2" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
-				<ScrollViewer>
-					<controls:InspectorPanel x:Name="Inspector" Margin="8" />
-				</ScrollViewer>
-			</Border>
+	<NativeMenu.Menu>
+		<NativeMenu>
+			<NativeMenuItem Header="File" x:DataType="vm:MainWindowViewModel">
+				<NativeMenuItem.Menu>
+					<NativeMenu x:DataType="vm:MainWindowViewModel">
+						<NativeMenuItem Header="New..." Command="{Binding NewScheduleCommand}" Gesture="Ctrl+N" />
+						<NativeMenuItem Header="Load..." Command="{Binding LoadCommand}" Gesture="Ctrl+O" />
+						<NativeMenuItem Header="Save..." Command="{Binding SaveCommand}" Gesture="Ctrl+S" />
+						<NativeMenuItem Header="Export..." Command="{Binding ExportCommand}" Gesture="Ctrl+E" />
+						<NativeMenuItemSeparator />
+						<NativeMenuItem Header="Exit" Click="OnExitClick" />
+					</NativeMenu>
+				</NativeMenuItem.Menu>
+			</NativeMenuItem>
+			<NativeMenuItem Header="Edit" x:DataType="vm:MainWindowViewModel">
+				<NativeMenuItem.Menu>
+					<NativeMenu x:DataType="vm:MainWindowViewModel">
+						<NativeMenuItem Header="Undo" Command="{Binding UndoCommand}" Gesture="Ctrl+Z" />
+						<NativeMenuItem Header="Redo" Command="{Binding RedoCommand}" Gesture="Ctrl+Y" />
+					</NativeMenu>
+				</NativeMenuItem.Menu>
+			</NativeMenuItem>
+		</NativeMenu>
+	</NativeMenu.Menu>
+
+	<!--Renders the window's NativeMenu inside the window on platforms without a system menu bar (Windows, Linux).-->
+	<DockPanel LastChildFill="True">
+		<NativeMenuBar DockPanel.Dock="Top" />
+		<Grid Margin="4" Background="{x:Static app:ThemeDefinition.Background}">
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*" MinWidth="100" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="280" MinWidth="200" />
+				</Grid.ColumnDefinitions>
+				<Border Grid.Column="0" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
+					<controls:PreviewCanvas x:Name="Canvas" Document="{Binding Document}" />
+				</Border>
+				<GridSplitter Grid.Column="1" Width="6" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Background="Transparent" />
+				<Border Grid.Column="2" BorderBrush="{x:Static app:ThemeDefinition.Border}" BorderThickness="1" ClipToBounds="True">
+					<ScrollViewer>
+						<controls:InspectorPanel x:Name="Inspector" Margin="8" />
+					</ScrollViewer>
+				</Border>
+			</Grid>
 		</Grid>
-	</Grid>
+	</DockPanel>
 
 </Window>

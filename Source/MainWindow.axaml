@@ -7,7 +7,8 @@
         x:DataType="vm:MainWindowViewModel"
         Title="WHAT SCHEDULE?!"
         Width="1920" Height="1080"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Background="{x:Static app:ThemeDefinition.Background}">
 
 	<Design.DataContext>
 		<vm:MainWindowViewModel />

@@ -8,11 +8,46 @@
         Title="WHAT SCHEDULE?!"
         Width="1920" Height="1080"
         WindowStartupLocation="CenterScreen"
+        WindowDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="32"
         Background="{x:Static app:ThemeDefinition.Background}">
 
 	<Design.DataContext>
 		<vm:MainWindowViewModel />
 	</Design.DataContext>
+
+	<Window.Styles>
+		<!--The window draws its own title bar (the system one is off), so it also draws its own caption buttons.-->
+		<Style Selector="Button.windowButton">
+			<Setter Property="Width" Value="46" />
+			<Setter Property="Height" Value="32" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="Focusable" Value="False" />
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border x:Name="Hover" Background="Transparent">
+						<ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+										  HorizontalAlignment="Center" VerticalAlignment="Center" />
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		<Style Selector="Button.windowButton:pointerover /template/ Border#Hover">
+			<Setter Property="Background" Value="#22FFFFFF" />
+		</Style>
+		<Style Selector="Button.windowButton:pressed /template/ Border#Hover">
+			<Setter Property="Background" Value="#14FFFFFF" />
+		</Style>
+		<Style Selector="Button.closeButton:pointerover /template/ Border#Hover">
+			<Setter Property="Background" Value="#C42B1C" />
+		</Style>
+		<!--A maximized window shows the restore glyph instead of the maximize one.-->
+		<Style Selector="Window[WindowState=Maximized] Path#MaximizeGlyph">
+			<Setter Property="Data" Value="M0.5,0.5 L6.5,0.5 L6.5,6.5 L0.5,6.5 Z M3.5,3.5 L9.5,3.5 L9.5,9.5 L3.5,9.5 Z" />
+		</Style>
+	</Window.Styles>
 
 	<Window.KeyBindings>
 		<!--NativeMenuItem.Gesture only labels the menu entry; these make the shortcuts actually fire.-->
@@ -51,6 +86,27 @@
 
 	<!--Renders the window's NativeMenu inside the window on platforms without a system menu bar (Windows, Linux).-->
 	<DockPanel LastChildFill="True">
+		<!--The custom title bar: dragging it moves the window, double-tapping maximizes or restores it.-->
+		<Border x:Name="TitleBar" DockPanel.Dock="Top" Height="32"
+				Background="{x:Static app:ThemeDefinition.RulerBackground}"
+				PointerPressed="OnTitleBarPressed" DoubleTapped="OnTitleBarDoubleTapped">
+			<Grid>
+				<TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
+						   Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12"
+						   Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+				<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Stretch">
+					<Button Classes="windowButton" Click="OnMinimizeClick">
+						<Path Width="10" Height="10" Stroke="#FFFFFFFF" StrokeThickness="1" Data="M0.5,4.5 L9.5,4.5" />
+					</Button>
+					<Button Classes="windowButton" Click="OnMaximizeClick">
+						<Path x:Name="MaximizeGlyph" Width="10" Height="10" Stroke="#FFFFFFFF" StrokeThickness="1" Data="M0.5,0.5 L9.5,0.5 L9.5,9.5 L0.5,9.5 Z" />
+					</Button>
+					<Button Classes="windowButton closeButton" Click="OnCloseClick">
+						<Path Width="10" Height="10" Stroke="#FFFFFFFF" StrokeThickness="1" Data="M0.5,0.5 L9.5,9.5 M9.5,0.5 L0.5,9.5" />
+					</Button>
+				</StackPanel>
+			</Grid>
+		</Border>
 		<NativeMenuBar DockPanel.Dock="Top" />
 		<Grid Margin="4" Background="{x:Static app:ThemeDefinition.Background}">
 			<Grid>

@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using WhatSchedule.Controls.Dialogs;
 using WhatSchedule.ViewModels;
 
@@ -21,6 +23,33 @@ public partial class MainWindow : Window
 		if (DataContext is MainWindowViewModel viewModel)
 			viewModel.StorageProvider = StorageProvider;
 	}
+
+	//The window has no system title bar (WindowDecorations="BorderOnly"), so the custom one in MainWindow.axaml moves,
+	//minimizes, maximizes and closes the window instead.
+
+	/// <summary>Starts dragging the window from the custom title bar.</summary>
+	private void OnTitleBarPressed(object? sender, PointerPressedEventArgs e)
+	{
+		if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+			BeginMoveDrag(e);
+	}
+
+	/// <summary>Maximizes or restores the window when the title bar is double-tapped, ignoring taps on the caption buttons.</summary>
+	private void OnTitleBarDoubleTapped(object? sender, TappedEventArgs e)
+	{
+		if (e.Source is Button)
+			return;
+
+		SetMaximized(WindowState != WindowState.Maximized);
+	}
+
+	private void OnMinimizeClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+	private void OnMaximizeClick(object? sender, RoutedEventArgs e) => SetMaximized(WindowState != WindowState.Maximized);
+
+	private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
+
+	private void SetMaximized(bool maximized) => WindowState = maximized ? WindowState.Maximized : WindowState.Normal;
 
 	/// <summary>Cancels the close and asks the user to confirm it; the window closes only once the user confirms.</summary>
 	protected override async void OnClosing(WindowClosingEventArgs e)

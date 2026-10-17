@@ -235,6 +235,14 @@ public sealed class LabelElement : CanvasElement
 		FlipY = snapshot.FlipY;
 	}
 
+	/// <summary>Creates a deep copy of the label by restoring its full state record into a fresh element.</summary>
+	public override CanvasElement Clone()
+	{
+		var clone = new LabelElement();
+		clone.RestoreState(CaptureState());
+		return clone;
+	}
+
 	/// <summary>The name of the offered font style matching the element's weight and slant,
 	/// or the first style when the element carries a cut the row does not offer.</summary>
 	private string GetStyleName() => (FontStyles.FirstOrDefault(style => style.Style.Weight == FontStyle.Weight && style.Style.Slant == FontStyle.Slant).Name ?? FontStyles[0].Name)!;

@@ -174,6 +174,14 @@ namespace WhatSchedule.Elements
 			canvas.RestoreToCount(count);
 		}
 
+		/// <summary>Creates a copy of the image element sharing the bitmap (which is never modified) and restoring the rest of its state.</summary>
+		public override CanvasElement Clone()
+		{
+			var clone = new ImageElement(Bitmap, SKPoint.Empty);
+			clone.RestoreState(CaptureState());
+			return clone;
+		}
+
 		/// <summary>Clamps <paramref name="crop"/> so it stays inside the bitmap and never collapses to nothing.</summary>
 		private SKRect ClampCrop(SKRect crop)
 		{

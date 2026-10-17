@@ -78,6 +78,11 @@
 					<NativeMenu x:DataType="vm:MainWindowViewModel">
 						<NativeMenuItem Header="Undo" Command="{Binding UndoCommand}" Gesture="Ctrl+Z" />
 						<NativeMenuItem Header="Redo" Command="{Binding RedoCommand}" Gesture="Ctrl+Y" />
+						<NativeMenuItemSeparator />
+						<!--Copy, cut and paste act on the canvas selection; the shortcuts themselves are handled by the canvas.-->
+						<NativeMenuItem Header="Cut" Click="OnCutClick" Gesture="Ctrl+X" />
+						<NativeMenuItem Header="Copy" Click="OnCopyClick" Gesture="Ctrl+C" />
+						<NativeMenuItem Header="Paste" Click="OnPasteClick" Gesture="Ctrl+V" />
 					</NativeMenu>
 				</NativeMenuItem.Menu>
 			</NativeMenuItem>

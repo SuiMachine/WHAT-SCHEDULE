@@ -71,6 +71,9 @@ public abstract class CanvasElement
 	/// <summary>Restores a state previously captured by <see cref="CaptureState"/>.</summary>
 	public abstract void RestoreState(ElementState state);
 
+	/// <summary>Creates a deep copy of the element with the same state, e.g. for the copy/paste clipboard.</summary>
+	public abstract CanvasElement Clone();
+
 	/// <summary>
 	/// Resizes the element so that <paramref name="anchor"/>, the corner opposite the grabbed
 	/// handle, stays fixed while the drag cursor is at <paramref name="cursor"/>. Both points

@@ -85,4 +85,12 @@ public partial class MainWindow : Window
 	private async void OnAddLabelClick(object? sender, EventArgs e) => await Canvas.Menus.AddLabelAsync(new SKPoint(0, 0));
 
 	private async void OnAddImageClick(object? sender, EventArgs e) => await Canvas.Menus.AddImageAsync(new SKPoint(0, 0));
+
+	//The clipboard is internal to the canvas; the menu items cover focus it loses to other controls.
+
+	private void OnCutClick(object? sender, EventArgs e) => Canvas.CutSelection();
+
+	private void OnCopyClick(object? sender, EventArgs e) => Canvas.CopySelection();
+
+	private void OnPasteClick(object? sender, EventArgs e) => Canvas.PasteClipboard();
 }

@@ -41,6 +41,15 @@ public class PreviewCanvas : Control, IDisposable
 
 	private IPointerDrag? activeDrag;
 
+	/// <summary>The element copied by Ctrl+C or cut, waiting to be pasted.</summary>
+	private CanvasElement? clipboardElement;
+
+	/// <summary>How many times the current clipboard content was pasted, so each paste lands one step further from the corner.</summary>
+	private int pasteCount;
+
+	/// <summary>The gap between pasted elements, in document pixels.</summary>
+	private const float PasteStep = 20f;
+
 	/// <summary>Raised after the element selected on the canvas changed.</summary>
 	internal event Action? SelectionChanged;
 
@@ -86,7 +95,22 @@ public class PreviewCanvas : Control, IDisposable
 		if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
 			return;
 
-		if (e.Key == Key.Z)
+		if (e.Key == Key.C)
+		{
+			CopySelection();
+			e.Handled = true;
+		}
+		else if (e.Key == Key.X)
+		{
+			CutSelection();
+			e.Handled = true;
+		}
+		else if (e.Key == Key.V)
+		{
+			PasteClipboard();
+			e.Handled = true;
+		}
+		else if (e.Key == Key.Z)
 		{
 			//Ctrl+Shift+Z redoes, like Ctrl+Y does.
 			if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
@@ -100,6 +124,43 @@ public class PreviewCanvas : Control, IDisposable
 			document.History.Redo(document);
 			e.Handled = true;
 		}
+	}
+
+	/// <summary>Copies the selected element to the internal clipboard; Ctrl+C and Edit &gt; Copy.</summary>
+	public bool CopySelection()
+	{
+		if (Selection.SelectedElement is not { } element)
+			return false;
+
+		clipboardElement = element.Clone();
+		pasteCount = 0;
+		return true;
+	}
+
+	/// <summary>Copies the selected element to the internal clipboard and removes it from the document; Ctrl+X and Edit &gt; Cut.</summary>
+	public bool CutSelection()
+	{
+		if (Document is not { } document || Selection.SelectedElement is not { } element || !document.RemoveTracked(element))
+			return false;
+
+		clipboardElement = element.Clone();
+		pasteCount = 0;
+		return true;
+	}
+
+	/// <summary>Pastes the clipboard element in the top left corner, every paste one step further away; Ctrl+V and Edit &gt; Paste.</summary>
+	public bool PasteClipboard()
+	{
+		if (Document is not { } document || clipboardElement is null)
+			return false;
+
+		var element = clipboardElement.Clone();
+		element.Position = new SKPoint(PasteStep * pasteCount, PasteStep * pasteCount);
+		pasteCount++;
+
+		document.AddTracked(element);
+		Selection.SelectedElement = element;
+		return true;
 	}
 
 	protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

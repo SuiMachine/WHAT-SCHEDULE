@@ -360,7 +360,6 @@ public class PreviewCanvas : Control, IDisposable
 	{
 		var bounds = new Rect(Bounds.Size);
 		context.FillRectangle(ThemeDefinition.Background, bounds);
-		RulerRenderer.DrawBorders(context, bounds);
 
 		var document = Document;
 		if (document is null || document.Width <= 0 || document.Height <= 0)
@@ -377,5 +376,6 @@ public class PreviewCanvas : Control, IDisposable
 		Selection.Draw(context, imageRect, Viewport.Scale);
 		GuideLayer.Draw(context, ContentRect, imageRect, Viewport.Scale, document);
 		Rulers.Draw(context, bounds, imageRect, new Size(document.Width, document.Height), Viewport.Scale);
+		RulerRenderer.DrawBorders(context, bounds);
 	}
 }

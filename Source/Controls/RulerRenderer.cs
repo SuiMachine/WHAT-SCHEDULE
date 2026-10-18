@@ -20,14 +20,17 @@ internal sealed class RulerRenderer
 
 	public static void DrawBorders(DrawingContext context, Rect bounds)
 	{
-		context.DrawLine(ThemeDefinition.RulerBorderPen, new Point(0, ThemeDefinition.RulerThickness), new Point(bounds.Width, ThemeDefinition.RulerThickness));
-		context.DrawLine(ThemeDefinition.RulerBorderPen, new Point(ThemeDefinition.RulerThickness, 0), new Point(ThemeDefinition.RulerThickness, bounds.Height));
+		context.DrawLine(ThemeDefinition.RulerBorderPen, new Point(-1, ThemeDefinition.RulerThickness - 0.5), new Point(bounds.Width + 1, ThemeDefinition.RulerThickness - 0.5));
+		context.DrawLine(ThemeDefinition.RulerBorderPen, new Point(ThemeDefinition.RulerThickness - 0.5, -1), new Point(ThemeDefinition.RulerThickness - 0.5, bounds.Height + 1));
 	}
 
 	public void Draw(DrawingContext context, Rect bounds, Rect imageRect, Size imageSize, double scale)
 	{
-		var horizontalStrip = new Rect(ThemeDefinition.RulerThickness, 0, bounds.Width - ThemeDefinition.RulerThickness, ThemeDefinition.RulerThickness);
-		var verticalStrip = new Rect(0, ThemeDefinition.RulerThickness, ThemeDefinition.RulerThickness, bounds.Height - ThemeDefinition.RulerThickness);
+		var horizontalStrip = new Rect(ThemeDefinition.RulerThickness, -1, bounds.Width + 1 - ThemeDefinition.RulerThickness, ThemeDefinition.RulerThickness);
+		var verticalStrip = new Rect(-1, ThemeDefinition.RulerThickness, ThemeDefinition.RulerThickness, bounds.Height + 1 - ThemeDefinition.RulerThickness);
+
+		var corner = new Rect(-1, -1, ThemeDefinition.RulerThickness, ThemeDefinition.RulerThickness);
+		context.FillRectangle(ThemeDefinition.RulerBackground, corner);
 
 		context.FillRectangle(ThemeDefinition.RulerBackground, horizontalStrip);
 		context.FillRectangle(ThemeDefinition.RulerBackground, verticalStrip);

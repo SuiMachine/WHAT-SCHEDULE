@@ -11,6 +11,7 @@ namespace WhatSchedule.Controls.Dialogs
 		{
 			InitializeComponent();
 			ColorPickerControl.Color = new Color(initialColor.Red, initialColor.Green, initialColor.Blue, initialColor.Alpha);
+			Background = ThemeDefinition.Background;
 		}
 
 		public static async Task<SKColor?> ShowDialog(Window owner, SKColor initialColor)

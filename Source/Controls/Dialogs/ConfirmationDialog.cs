@@ -14,6 +14,7 @@ namespace WhatSchedule.Controls.Dialogs
 			CanResize = false;
 			ShowInTaskbar = false;
 			MinWidth = 360;
+			Background = ThemeDefinition.Background;
 
 			var cancelButton = new Button { Content = "Cancel", IsCancel = true };
 			var confirmButton = new Button { Content = confirmText, IsDefault = true };

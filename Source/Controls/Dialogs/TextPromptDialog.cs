@@ -10,6 +10,7 @@ using Avalonia.Controls;using Avalonia.Layout;namespace WhatSchedule.Controls
 			CanResize = false;
 			ShowInTaskbar = false;
 			MinWidth = 360;
+			Background = ThemeDefinition.Background;
 
 			var textBox = new TextBox
 			{
@@ -27,7 +28,8 @@ using Avalonia.Controls;using Avalonia.Layout;namespace WhatSchedule.Controls
 			{
 				Margin = new Avalonia.Thickness(12),
 				Spacing = 12,
-				Children =			{				textBox,				new StackPanel				{					Orientation = Orientation.Horizontal,					Spacing = 8,					HorizontalAlignment = HorizontalAlignment.Right,					Children = { okButton, cancelButton },				},			},
+				Children =				{					textBox,					new StackPanel					{						Orientation = Orientation.Horizontal,						Spacing = 8,						HorizontalAlignment = HorizontalAlignment.Right,						Children = { okButton, cancelButton },					},
+				},
 			};
 
 			Opened += (_, _) => textBox.Focus();

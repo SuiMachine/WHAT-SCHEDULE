@@ -243,13 +243,42 @@ namespace WhatSchedule.Elements
 			builder.AddRow(string.Empty, reset);
 
 			builder.AddSection("Crop");
-			builder.AddNumber("X", () => Crop.Left, value => Crop = SKRect.Create(value, Crop.Top, Crop.Width, Crop.Height));
-			builder.AddNumber("Y", () => Crop.Top, value => Crop = SKRect.Create(Crop.Left, value, Crop.Width, Crop.Height));
-			builder.AddNumber("Width", () => Crop.Width, value => Crop = SKRect.Create(Crop.Left, Crop.Top, Math.Max(1, value), Crop.Height));
-			builder.AddNumber("Height", () => Crop.Height, value => Crop = SKRect.Create(Crop.Left, Crop.Top, Crop.Width, Math.Max(1, value)));
+			//Each number is how many bitmap pixels are trimmed off that edge; the opposite edge stays fixed, so editing one side can only ever cut that side.
+			//Applying a crop also resizes the element to the new crop at the drawn scale and shifts it by the edges that moved,
+			//so the remaining pixels stay put and are never stretched to refill the old frame.
+			void ApplyCrop(SKRect newCrop)
+			{
+				var scaleX = Crop.Width != 0 ? Width / Crop.Width : 1f;
+				var scaleY = Crop.Height != 0 ? Height / Crop.Height : 1f;
+				Position = new SKPoint(Position.X + (newCrop.Left - Crop.Left) * scaleX, Position.Y + (newCrop.Top - Crop.Top) * scaleY);
+				Crop = newCrop;
+				Width = (float)Math.Max(ThemeDefinition.MinElementSize, newCrop.Width * scaleX);
+				Height = (float)Math.Max(ThemeDefinition.MinElementSize, newCrop.Height * scaleY);
+			}
+
+			builder.AddNumber("Left", () => Crop.Left, value =>
+			{
+				var left = Math.Clamp(value, 0f, Crop.Right - 1f);
+				ApplyCrop(SKRect.Create(left, Crop.Top, Crop.Right - left, Crop.Height));
+			}, 0f);
+			builder.AddNumber("Right", () => Bitmap.Width - Crop.Right, value =>
+			{
+				var right = Math.Clamp(Bitmap.Width - value, Crop.Left + 1f, Bitmap.Width);
+				ApplyCrop(SKRect.Create(Crop.Left, Crop.Top, right - Crop.Left, Crop.Height));
+			}, 0f);
+			builder.AddNumber("Top", () => Crop.Top, value =>
+			{
+				var top = Math.Clamp(value, 0f, Crop.Bottom - 1f);
+				ApplyCrop(SKRect.Create(Crop.Left, top, Crop.Width, Crop.Bottom - top));
+			}, 0f);
+			builder.AddNumber("Bottom", () => Bitmap.Height - Crop.Bottom, value =>
+			{
+				var bottom = Math.Clamp(Bitmap.Height - value, Crop.Top + 1f, Bitmap.Height);
+				ApplyCrop(SKRect.Create(Crop.Left, Crop.Top, Crop.Width, bottom - Crop.Top));
+			}, 0f);
 
 			var resetCrop = new Button { Content = "Reset Crop", HorizontalAlignment = HorizontalAlignment.Stretch };
-			resetCrop.Click += (_, _) => builder.Apply(() => Crop = new SKRect(0, 0, Bitmap.Width, Bitmap.Height));
+			resetCrop.Click += (_, _) => builder.Apply(() => ApplyCrop(new SKRect(0, 0, Bitmap.Width, Bitmap.Height)));
 			builder.AddRow(string.Empty, resetCrop);
 
 			builder.AddSection("Appearance");
@@ -287,14 +316,17 @@ namespace WhatSchedule.Elements
 
 			public float? Height { get; set; }
 
-			/// <summary>The crop rectangle in bitmap pixels; null in documents saved before cropping existed.</summary>
-			public float? CropX { get; set; }
+			/// <summary>Pixels trimmed from the bitmap's left edge; 0 keeps the edge.</summary>
+			public float CropLeft { get; set; }
 
-			public float? CropY { get; set; }
+			/// <summary>Pixels trimmed from the bitmap's top edge; 0 keeps the edge.</summary>
+			public float CropTop { get; set; }
 
-			public float? CropWidth { get; set; }
+			/// <summary>Pixels trimmed from the bitmap's right edge; 0 keeps the edge.</summary>
+			public float CropRight { get; set; }
 
-			public float? CropHeight { get; set; }
+			/// <summary>Pixels trimmed from the bitmap's bottom edge; 0 keeps the edge.</summary>
+			public float CropBottom { get; set; }
 
 			public float? Opacity { get; set; }
 

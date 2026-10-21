@@ -26,8 +26,9 @@ public interface IInspectorBuilder
 	void AddComboBox(string header, string[] items, Func<string> getter, Action<string> setter);
 
 	/// <summary>A numeric editor with spin buttons that previews the value live while it changes and
-	/// commits a whole edit run as a single undo entry; invalid input is discarded.</summary>
-	void AddNumber(string header, Func<float> getter, Action<float> setter);
+	/// commits a whole edit run as a single undo entry; invalid input is discarded, and the value is
+	/// clamped to <paramref name="minimum"/> and <paramref name="maximum"/> when they are given.</summary>
+	void AddNumber(string header, Func<float> getter, Action<float> setter, float? minimum = null, float? maximum = null);
 
 	/// <summary>A switch that commits as soon as the user toggles it.</summary>
 	void AddToggle(string header, Func<bool> getter, Action<bool> setter);

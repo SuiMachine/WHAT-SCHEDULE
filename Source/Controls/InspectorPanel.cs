@@ -94,7 +94,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddTextBox(string header, Func<string> getter, Action<string> setter) => AddTextBox(header, getter, setter);
 	void IInspectorBuilder.AddTextArea(string header, Func<string> getter, Action<string> setter) => AddTextArea(header, getter, setter);
 	void IInspectorBuilder.AddComboBox(string header, string[] items, Func<string> getter, Action<string> setter) => AddComboBox(header, items, getter, setter);
-	void IInspectorBuilder.AddNumber(string header, Func<float> getter, Action<float> setter) => AddNumber(header, getter, setter);
+	void IInspectorBuilder.AddNumber(string header, Func<float> getter, Action<float> setter, float? minimum, float? maximum) => AddNumber(header, getter, setter, minimum, maximum);
 	void IInspectorBuilder.AddToggle(string header, Func<bool> getter, Action<bool> setter) => AddToggle(header, getter, setter);
 	void IInspectorBuilder.AddSlider(string header, float minimum, float maximum, Func<float> getter, Action<float> setter) => AddSlider(header, minimum, maximum, getter, setter);
 	void IInspectorBuilder.AddColor(string header, Func<SKColor> getter, Action<SKColor> setter) => AddColor(header, getter, setter);
@@ -359,12 +359,15 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	/// <summary>A numeric editor with spin buttons. The value is previewed live while it changes and a whole
 	/// edit run (typing, a pointer drag on a spin button, or a run of held keyboard steps) commits as a
 	/// single undo entry when the run ends on Enter or focus loss; input the control cannot parse is discarded.</summary>
-	private void AddNumber(string header, Func<float> get, Action<float> set)
+	private void AddNumber(string header, Func<float> get, Action<float> set, float? minimum = null, float? maximum = null)
 	{
+		//The bounds are decimal's own extremes when absent; a float bound always fits inside that range.
 		var box = new NumericUpDown
 		{
 			FormatString = "0.##",
 			NumberFormat = CultureInfo.InvariantCulture.NumberFormat,
+			Minimum = (decimal?)minimum ?? decimal.MinValue,
+			Maximum = (decimal?)maximum ?? decimal.MaxValue
 		};
 
 		//Value changes that come from the sync refresh must not start an edit or commit anything.
@@ -394,13 +397,15 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			set((float)value);
 			canvas?.Document?.RaiseChanged();
 		};
-		box.LostFocus += (_, _) => Commit();
+		//A setter may clamp what was typed into something legal; re-reading on commit keeps the box from showing a value that never landed.
+		box.LostFocus += (_, _) => { Commit(); Refresh(); };
 		box.KeyDown += (_, e) =>
 		{
 			if (e.Key != Key.Enter)
 				return;
 
 			Commit();
+			Refresh();
 			e.Handled = true;
 		};
 

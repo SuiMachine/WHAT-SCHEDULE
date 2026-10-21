@@ -108,10 +108,10 @@ namespace WhatSchedule.Documents
 				Png = EncodePng(image.Bitmap),
 				Width = image.Width,
 				Height = image.Height,
-				CropX = image.Crop.Left,
-				CropY = image.Crop.Top,
-				CropWidth = image.Crop.Width,
-				CropHeight = image.Crop.Height,
+				CropLeft = image.Crop.Left,
+				CropTop = image.Crop.Top,
+				CropRight = image.Bitmap.Width - image.Crop.Right,
+				CropBottom = image.Bitmap.Height - image.Crop.Bottom,
 				Opacity = image.Opacity,
 				CornerRadius = image.CornerRadius,
 				FlipX = image.FlipX,
@@ -194,8 +194,8 @@ namespace WhatSchedule.Documents
 							TintMode = Enum.TryParse(image.TintMode, out SKBlendMode tintMode) ? tintMode : SKBlendMode.SrcIn,
 							BlendMode = Enum.TryParse(image.BlendMode, out SKBlendMode imageBlendMode) ? imageBlendMode : SKBlendMode.SrcOver
 						};
-						if (image.CropX is { } cropX && image.CropY is { } cropY && image.CropWidth is { } cropWidth && image.CropHeight is { } cropHeight)
-							restored.Crop = SKRect.Create(cropX, cropY, cropWidth, cropHeight);
+						restored.Crop = SKRect.Create(image.CropLeft, image.CropTop,
+							bitmap.Width - image.CropLeft - image.CropRight, bitmap.Height - image.CropTop - image.CropBottom);
 						element = restored;
 						break;
 					}

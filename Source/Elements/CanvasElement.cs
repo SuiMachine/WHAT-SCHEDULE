@@ -21,6 +21,9 @@ public abstract class CanvasElement
 	/// <summary>The element's kind as shown to the user, e.g. in the undo history.</summary>
 	public abstract string Kind { get; }
 
+	/// <summary>The element's name as shown in the hierarchy list; the kind by default.</summary>
+	public virtual string DisplayName => Kind;
+
 	/// <summary>The center the element rotates around, in document pixels.</summary>
 	public SKPoint Center => new(Position.X + Size.Width / 2, Position.Y + Size.Height / 2);
 

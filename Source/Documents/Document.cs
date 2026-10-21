@@ -75,6 +75,28 @@ public sealed class Document
 		return true;
 	}
 
+	/// <summary>
+	/// Moves an element to an absolute position in the layering order and records the move in the undo
+	/// history. The <paramref name="index"/> is the element's position in <see cref="Elements"/> after
+	/// the move; moving an element to its own index changes nothing.
+	/// </summary>
+	public bool ReorderToTracked(CanvasElement element, int index)
+	{
+		var current = elements.IndexOf(element);
+		if (current < 0)
+			return false;
+
+		index = Math.Clamp(index, 0, elements.Count - 1);
+		if (index == current)
+			return false;
+
+		elements.RemoveAt(current);
+		elements.Insert(index, element);
+		History.Push(new ElementReorderAction(element, current, index));
+		RaiseChanged();
+		return true;
+	}
+
 	/// <summary>Records an element state change in the undo history, skipping it when the state did not actually change.</summary>
 	public void RecordStateChange(CanvasElement element, CanvasElement.ElementState before, string description)
 	{

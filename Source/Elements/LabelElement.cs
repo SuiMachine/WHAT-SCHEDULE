@@ -17,6 +17,16 @@ public sealed class LabelElement : CanvasElement
 	/// <summary>The element's kind as shown to the user, e.g. in the undo history.</summary>
 	public override string Kind => LabelElementData.KindName;
 
+	/// <summary>The first non-empty line of the label text, or its kind when there is none, as shown in the hierarchy list.</summary>
+	public override string DisplayName
+	{
+		get
+		{
+			var line = Text.Split('\n').Select(part => part.Trim()).FirstOrDefault(part => part.Length > 0);
+			return line ?? Kind;
+		}
+	}
+
 	/// <summary>The named cuts of a font family the style row offers.</summary>
 	private static readonly (string Name, SKFontStyle Style)[] FontStyles =
 	{

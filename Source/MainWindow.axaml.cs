@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 	{
 		InitializeComponent();
 		Inspector.Bind(Canvas);
+		Hierarchy.Bind(Canvas);
 	}
 
 	protected override void OnOpened(EventArgs e)

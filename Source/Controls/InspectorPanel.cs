@@ -266,26 +266,57 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		sectionControls.Add(editor);
 	}
 
-	/// <summary>A text editor that commits on Enter or when it loses focus; empty input is discarded.</summary>
+	/// <summary>A text editor that previews every keystroke on the canvas and records the whole edit
+	/// run as one undo entry when it ends on Enter or focus loss; empty input reverts the element.</summary>
 	private void AddTextBox(string header, Func<string> get, Action<string> set)
 	{
 		var box = new TextBox();
-		void Refresh() => box.Text = get();
+
+		//Value changes that come from the sync refresh must not start an edit or commit anything.
+		var syncing = false;
+		var editStart = default(CanvasElement.ElementState);
+
+		void Refresh()
+		{
+			syncing = true;
+			box.Text = get();
+			syncing = false;
+		}
+
 		void Commit()
 		{
-			var text = box.Text ?? string.Empty;
-			if (string.IsNullOrWhiteSpace(text))
+			if (editStart is not { } before)
+				return;
+
+			//An element with no text could never be picked again on the canvas, so clearing the
+			//field and leaving it reverts the element instead of recording a change.
+			if (string.IsNullOrWhiteSpace(box.Text))
 			{
-				//An element with no text has no size, so it could never be picked again on the canvas.
+				editStart = null;
+				if (element is not null)
+				{
+					element.RestoreState(before);
+					canvas?.Document?.RaiseChanged();
+				}
+
 				Refresh();
 				return;
 			}
 
-			Apply(() => set(text));
-			Refresh();
+			if (element is not null)
+				canvas?.Document?.RecordStateChange(element, before);
+			editStart = null;
 		}
 
-		Refresh();
+		box.TextChanged += (_, _) =>
+		{
+			if (syncing)
+				return;
+
+			editStart ??= element?.CaptureState();
+			set(box.Text ?? string.Empty);
+			canvas?.Document?.RaiseChanged();
+		};
 		box.LostFocus += (_, _) => Commit();
 		box.KeyDown += (_, e) =>
 		{
@@ -296,12 +327,14 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			e.Handled = true;
 		};
 
+		Refresh();
 		AddRow(header, box);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
 	}
 
-	/// <summary>A multi-line text editor that commits when it loses focus; Enter adds a line break and empty
-	/// input is discarded, because an element with no text could never be picked again on the canvas.</summary>
+	/// <summary>A multi-line text editor that previews every keystroke on the canvas and records the whole
+	/// edit run as one undo entry when the field loses focus. Enter adds a line break, and clearing the
+	/// field and leaving it reverts the element, because an element with no text could never be picked again on the canvas.</summary>
 	private void AddTextArea(string header, Func<string> get, Action<string> set)
 	{
 		var box = new TextBox
@@ -312,23 +345,52 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			MaxHeight = 140,
 			VerticalContentAlignment = VerticalAlignment.Top,
 		};
-		void Refresh() => box.Text = get();
-		void Commit()
+
+		//Value changes that come from the sync refresh must not start an edit or commit anything.
+		var syncing = false;
+		var editStart = default(CanvasElement.ElementState);
+
+		void Refresh()
 		{
-			var text = box.Text ?? string.Empty;
-			if (string.IsNullOrWhiteSpace(text))
+			syncing = true;
+			box.Text = get();
+			syncing = false;
+		}
+
+		box.TextChanged += (_, _) =>
+		{
+			if (syncing)
+				return;
+
+			//The TextBox inserts Windows line breaks; the label's text is stored with plain ones.
+			editStart ??= element?.CaptureState();
+			set((box.Text ?? string.Empty).Replace("\r\n", "\n"));
+			canvas?.Document?.RaiseChanged();
+		};
+
+		Refresh();
+		box.LostFocus += (_, _) =>
+		{
+			if (editStart is not { } before)
+				return;
+
+			if (string.IsNullOrWhiteSpace(box.Text))
 			{
+				editStart = null;
+				if (element is not null)
+				{
+					element.RestoreState(before);
+					canvas?.Document?.RaiseChanged();
+				}
+
 				Refresh();
 				return;
 			}
 
-			//The TextBox inserts Windows line breaks; the label's text is stored with plain ones.
-			Apply(() => set(text.Replace("\r\n", "\n")));
-			Refresh();
-		}
-
-		Refresh();
-		box.LostFocus += (_, _) => Commit();
+			if (element is not null)
+				canvas?.Document?.RecordStateChange(element, before);
+			editStart = null;
+		};
 
 		AddRow(header, box);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });

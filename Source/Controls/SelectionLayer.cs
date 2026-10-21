@@ -24,6 +24,9 @@ internal sealed class SelectionLayer
 	/// <summary>Raised after the selected element changed.</summary>
 	public event Action? SelectionChanged;
 
+	/// <summary>Whether the crop bounds of the selected image are drawn, i.e. Alt is held or a crop drag is in progress.</summary>
+	public bool ShowCropBounds { get; set; }
+
 	public CanvasElement? SelectedElement
 	{
 		get => selectedElement;
@@ -74,6 +77,49 @@ internal sealed class SelectionLayer
 			Math.Abs(position.Y - screen.Y) <= ThemeDefinition.HandleHitRadius;
 	}
 
+	/// <summary>The selection box edge <paramref name="position"/> is over, within the handle hit radius; only image elements have a crop to drag.</summary>
+	public Edge? HitTestEdge(Point position, Rect imageRect, double scale)
+	{
+		if (SelectedElement is not ImageElement)
+			return null;
+
+		var bounds = SelectedElement.Bounds;
+		var topLeft = ToScreen(SelectedElement.ToDocument(GetCorner(bounds, Corner.TopLeft)), imageRect, scale);
+		var topRight = ToScreen(SelectedElement.ToDocument(GetCorner(bounds, Corner.TopRight)), imageRect, scale);
+		var bottomRight = ToScreen(SelectedElement.ToDocument(GetCorner(bounds, Corner.BottomRight)), imageRect, scale);
+		var bottomLeft = ToScreen(SelectedElement.ToDocument(GetCorner(bounds, Corner.BottomLeft)), imageRect, scale);
+
+		var best = (Edge?)null;
+		var bestDistance = ThemeDefinition.HandleHitRadius;
+		void Check(Edge edge, Point a, Point b)
+		{
+			var distance = DistanceToSegment(position, a, b);
+			if (distance <= bestDistance)
+			{
+				best = edge;
+				bestDistance = distance;
+			}
+		}
+
+		Check(Edge.Top, topLeft, topRight);
+		Check(Edge.Right, topRight, bottomRight);
+		Check(Edge.Bottom, bottomRight, bottomLeft);
+		Check(Edge.Left, bottomLeft, topLeft);
+		return best;
+	}
+
+	/// <summary>The shortest distance from <paramref name="point"/> to the segment <paramref name="a"/>-<paramref name="b"/>.</summary>
+	private static double DistanceToSegment(Point point, Point a, Point b)
+	{
+		var dx = b.X - a.X;
+		var dy = b.Y - a.Y;
+		var lengthSquared = dx * dx + dy * dy;
+		var t = lengthSquared > 0 ? Math.Clamp(((point.X - a.X) * dx + (point.Y - a.Y) * dy) / lengthSquared, 0, 1) : 0;
+		var x = a.X + t * dx;
+		var y = a.Y + t * dy;
+		return Math.Sqrt((point.X - x) * (point.X - x) + (point.Y - y) * (point.Y - y));
+	}
+
 	/// <summary>The corner opposite <paramref name="corner"/>, which stays fixed while scaling.</summary>
 	public static SKPoint GetAnchor(SKRect bounds, Corner corner)
 	{
@@ -83,6 +129,18 @@ internal sealed class SelectionLayer
 			Corner.TopRight => new SKPoint(bounds.Left, bounds.Bottom),
 			Corner.BottomRight => new SKPoint(bounds.Left, bounds.Top),
 			_ => new SKPoint(bounds.Right, bounds.Top),
+		};
+	}
+
+	/// <summary>A point on the selection box edge opposite <paramref name="edge"/>, which stays fixed while cropping.</summary>
+	public static SKPoint GetCropAnchor(SKRect bounds, Edge edge)
+	{
+		return edge switch
+		{
+			Edge.Left => new SKPoint(bounds.Right, bounds.MidY),
+			Edge.Top => new SKPoint(bounds.MidX, bounds.Bottom),
+			Edge.Right => new SKPoint(bounds.Left, bounds.MidY),
+			_ => new SKPoint(bounds.MidX, bounds.Top),
 		};
 	}
 
@@ -127,6 +185,22 @@ internal sealed class SelectionLayer
 			ctx.EndFigure(true);
 		}
 		context.DrawGeometry(null, ThemeDefinition.SelectionPen, box);
+
+		//While Alt is held (or a crop drag runs), the dashed box shows the whole bitmap the crop hides.
+		if (ShowCropBounds && element is ImageElement image)
+		{
+			var extent = image.BitmapExtent;
+			var cropBounds = new StreamGeometry();
+			using (var ctx = cropBounds.Open())
+			{
+				ctx.BeginFigure(ToScreen(element.ToDocument(GetCorner(extent, Corner.TopLeft)), imageRect, scale), true);
+				ctx.LineTo(ToScreen(element.ToDocument(GetCorner(extent, Corner.TopRight)), imageRect, scale));
+				ctx.LineTo(ToScreen(element.ToDocument(GetCorner(extent, Corner.BottomRight)), imageRect, scale));
+				ctx.LineTo(ToScreen(element.ToDocument(GetCorner(extent, Corner.BottomLeft)), imageRect, scale));
+				ctx.EndFigure(true);
+			}
+			context.DrawGeometry(null, ThemeDefinition.CropBoundsPen, cropBounds);
+		}
 
 		var half = ThemeDefinition.HandleSize / 2;
 		foreach (var corner in AllCorners)

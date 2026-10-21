@@ -64,6 +64,7 @@ public class PreviewCanvas : Control, IDisposable
 		PointerCaptureLost += (_, _) =>
 		{
 			activeDrag = null;
+			Selection.ShowCropBounds = false;
 			Cursor = Cursor.Default;
 		};
 	}
@@ -221,11 +222,13 @@ public class PreviewCanvas : Control, IDisposable
 		if (document is null || document.Width <= 0 || document.Height <= 0 || !point.Properties.IsLeftButtonPressed)
 			return;
 
-		var drag = BeginDrag(point.Position);
+		var drag = BeginDrag(point.Position, e.KeyModifiers);
 		if (drag is null)
 			return;
 
 		activeDrag = drag;
+		Selection.ShowCropBounds = drag is ElementCropDrag ||
+			(e.KeyModifiers.HasFlag(KeyModifiers.Alt) && Selection.SelectedElement is ImageElement);
 		e.Pointer.Capture(this);
 		Cursor = drag.Cursor;
 		InvalidateVisual();
@@ -233,7 +236,7 @@ public class PreviewCanvas : Control, IDisposable
 	}
 
 	/// <summary>Runs the hit-test chain and returns the drag interaction it starts, falling back to panning.</summary>
-	private IPointerDrag BeginDrag(Point position)
+	private IPointerDrag BeginDrag(Point position, KeyModifiers modifiers)
 	{
 		var document = Document!;
 		var imageRect = GetImageRect(document);
@@ -245,6 +248,11 @@ public class PreviewCanvas : Control, IDisposable
 
 			if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
 				return new ElementScaleDrag(this, corner);
+
+			//Alt and an edge of the selection crops the image instead of scaling it.
+			if (Selection.SelectedElement is ImageElement && modifiers.HasFlag(KeyModifiers.Alt) &&
+				Selection.HitTestEdge(position, imageRect, Viewport.Scale) is { } edge)
+				return new ElementCropDrag(this, edge);
 
 			var guide = GuideLayer.CreateFromRuler(position, document, imageRect, Viewport.Scale) ?? GuideLayer.HitTest(position, document, imageRect, Viewport.Scale);
 			if (guide is not null)
@@ -273,7 +281,12 @@ public class PreviewCanvas : Control, IDisposable
 		var position = e.GetPosition(this);
 		if (activeDrag is null)
 		{
-			UpdateHoverCursor(position);
+			var showCrop = Selection.ShowCropBounds;
+			Selection.ShowCropBounds = e.KeyModifiers.HasFlag(KeyModifiers.Alt) && Selection.SelectedElement is ImageElement;
+			if (Selection.ShowCropBounds != showCrop)
+				InvalidateVisual();
+
+			UpdateHoverCursor(position, e.KeyModifiers);
 			return;
 		}
 
@@ -286,11 +299,11 @@ public class PreviewCanvas : Control, IDisposable
 			return;
 		base.OnPointerReleased(e);
 		activeDrag?.Release(e.GetPosition(this));
-		EndDrag(e.Pointer);
+		EndDrag(e.Pointer, e.KeyModifiers);
 		e.Handled = true;
 	}
 
-	private void EndDrag(IPointer pointer)
+	private void EndDrag(IPointer pointer, KeyModifiers modifiers)
 	{
 		if (activeDrag is null)
 			return;
@@ -301,10 +314,17 @@ public class PreviewCanvas : Control, IDisposable
 			pointer.Capture(null);
 		}
 
+		var showCrop = modifiers.HasFlag(KeyModifiers.Alt) && Selection.SelectedElement is ImageElement;
+		if (Selection.ShowCropBounds != showCrop)
+		{
+			Selection.ShowCropBounds = showCrop;
+			InvalidateVisual();
+		}
+
 		Cursor = Cursor.Default;
 	}
 
-	private void UpdateHoverCursor(Point position)
+	private void UpdateHoverCursor(Point position, KeyModifiers modifiers)
 	{
 		var document = Document;
 		if (document is null || Surface.Bitmap is null)
@@ -318,6 +338,9 @@ public class PreviewCanvas : Control, IDisposable
 			Cursor = CanvasCursors.Rotate;
 		else if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
 			Cursor = CanvasCursors.ForCorner(corner);
+		else if (Selection.SelectedElement is ImageElement && modifiers.HasFlag(KeyModifiers.Alt) &&
+			Selection.HitTestEdge(position, imageRect, Viewport.Scale) is { } edge)
+			Cursor = CanvasCursors.ForEdge(edge);
 		else if (GuideLayer.HitTest(position, document, imageRect, Viewport.Scale) is { } guide)
 			Cursor = guide.IsHorizontal ? CanvasCursors.HorizontalGuide : CanvasCursors.VerticalGuide;
 		else if (HitTestElement(position) is not null)

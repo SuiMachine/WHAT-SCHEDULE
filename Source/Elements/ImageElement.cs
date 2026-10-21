@@ -6,6 +6,15 @@ using SkiaSharp;
 
 namespace WhatSchedule.Elements
 {
+	/// <summary>A side of the selection box, for crop drags.</summary>
+	internal enum Edge
+	{
+		Left,
+		Top,
+		Right,
+		Bottom,
+	}
+
 	public sealed class ImageElement : CanvasElement
 	{
 		private static readonly SKPaint BitmapPaint = new()
@@ -91,6 +100,77 @@ namespace WhatSchedule.Elements
 		public override SKSize Size => new(Width, Height);
 
 		public override ScaleState BeginScale() => new ImageScaleState(Width, Height);
+
+		/// <summary>How many document pixels one bitmap pixel is currently drawn as, horizontally.</summary>
+		private float ScaleX => Crop.Width != 0 ? Width / Crop.Width : 1f;
+
+		/// <summary>How many document pixels one bitmap pixel is currently drawn as, vertically.</summary>
+		private float ScaleY => Crop.Height != 0 ? Height / Crop.Height : 1f;
+
+		/// <summary>The whole bitmap mapped to document pixels at the current drawn scale, sharing its crop-side edges with the frame; the frame reveals the <see cref="Crop"/> part of it.</summary>
+		internal SKRect BitmapExtent => SKRect.Create(
+			Bounds.Left - Crop.Left * ScaleX,
+			Bounds.Top - Crop.Top * ScaleY,
+			Bitmap.Width * ScaleX,
+			Bitmap.Height * ScaleY);
+
+		/// <summary>State of an image element captured when a crop drag starts, so every drag step is applied relative to the frame as it was when the drag began.</summary>
+		internal sealed record ImageCropState(SKRect Frame, SKRect Crop);
+
+		/// <summary>Captures the frame and crop for <see cref="CropTo"/> during a crop drag.</summary>
+		internal ImageCropState BeginCrop() => new(Bounds, Crop);
+
+		/// <summary>Moves the crop's <paramref name="edge"/> so it follows <paramref name="cursor"/> in the element's unrotated local space: dragging an edge inward crops more of the image away, dragging it outward reveals pixels the crop was hiding, and the opposite edge stays fixed. The frame is rebuilt at the drawn scale so the remaining pixels are never stretched.</summary>
+		internal void CropTo(SKPoint cursor, Edge edge, ImageCropState state)
+		{
+			var frame = state.Frame;
+			var crop = state.Crop;
+			var scaleX = crop.Width != 0 ? state.Frame.Width / crop.Width : 1f;
+			var scaleY = crop.Height != 0 ? state.Frame.Height / crop.Height : 1f;
+
+			//The dragged edge is where the cursor is on that axis, converted back to bitmap pixels at the drag's start scale.
+			var left = crop.Left;
+			var top = crop.Top;
+			var right = crop.Right;
+			var bottom = crop.Bottom;
+			switch (edge)
+			{
+				case Edge.Left: left = crop.Left + (cursor.X - frame.Left) / scaleX; break;
+				case Edge.Top: top = crop.Top + (cursor.Y - frame.Top) / scaleY; break;
+				case Edge.Right: right = crop.Right + (cursor.X - frame.Right) / scaleX; break;
+				case Edge.Bottom: bottom = crop.Bottom + (cursor.Y - frame.Bottom) / scaleY; break;
+			}
+
+			var newCrop = ClampCrop(SKRect.Create(left, top, right - left, bottom - top));
+
+			//The frame keeps the opposite edge where it was, so it only moves or shrinks on the dragged axis.
+			var frameLeft = frame.Left;
+			var frameTop = frame.Top;
+			var frameWidth = frame.Width;
+			var frameHeight = frame.Height;
+			switch (edge)
+			{
+				case Edge.Left:
+					frameLeft = frame.Left + (newCrop.Left - crop.Left) * scaleX;
+					frameWidth = (float)Math.Max(ThemeDefinition.MinElementSize, newCrop.Width * scaleX);
+					break;
+				case Edge.Top:
+					frameTop = frame.Top + (newCrop.Top - crop.Top) * scaleY;
+					frameHeight = (float)Math.Max(ThemeDefinition.MinElementSize, newCrop.Height * scaleY);
+					break;
+				case Edge.Right:
+					frameWidth = (float)Math.Max(ThemeDefinition.MinElementSize, newCrop.Width * scaleX);
+					break;
+				case Edge.Bottom:
+					frameHeight = (float)Math.Max(ThemeDefinition.MinElementSize, newCrop.Height * scaleY);
+					break;
+			}
+
+			Crop = newCrop;
+			Width = frameWidth;
+			Height = frameHeight;
+			Position = new SKPoint(frameLeft, frameTop);
+		}
 
 		public override void ScaleTo(SKPoint cursor, SKPoint anchor, ScaleState state, PointerEventArgs pointerEvent)
 		{

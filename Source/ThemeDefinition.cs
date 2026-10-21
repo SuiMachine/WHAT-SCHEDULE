@@ -18,6 +18,8 @@ public static class ThemeDefinition
 	public static readonly IPen TickPen = new Pen(RulerTick, 1);
 	public static readonly IPen SelectionPen = new Pen(Selection, 1);
 	public static readonly IPen GuidePen = new Pen(Guide, 1) { DashStyle = DashStyle.Dash };
+	/// <summary>Dashed like <see cref="GuidePen"/> to read as a preview rather than a real border.</summary>
+	public static readonly IPen CropBoundsPen = new Pen(Selection, 1) { DashStyle = DashStyle.Dash };
 	public static readonly Typeface LabelTypeface = Typeface.Default;
 
 	public const double RulerThickness = 22;

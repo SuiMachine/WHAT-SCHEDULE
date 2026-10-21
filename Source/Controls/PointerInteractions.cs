@@ -144,6 +144,54 @@ internal sealed class ElementScaleDrag : IPointerDrag
 	}
 }
 
+internal sealed class ElementCropDrag : IPointerDrag
+{
+	private readonly PreviewCanvas canvas;
+	private readonly Edge edge;
+	private readonly SKPoint anchor;
+	private readonly SKPoint anchorWorld;
+	private readonly ImageElement.ImageCropState start;
+	private readonly CanvasElement.ElementState startState;
+
+	public ElementCropDrag(PreviewCanvas canvas, Edge edge)
+	{
+		this.canvas = canvas;
+		this.edge = edge;
+		var element = (ImageElement)canvas.Selection.SelectedElement!;
+		anchor = SelectionLayer.GetCropAnchor(element.Bounds, edge);
+		anchorWorld = element.ToDocument(anchor);
+		start = element.BeginCrop();
+		startState = element.CaptureState();
+	}
+
+	public Cursor Cursor => CanvasCursors.ForEdge(edge);
+
+	public void Move(Point position, PointerEventArgs e)
+	{
+		var element = canvas.Selection.SelectedElement as ImageElement;
+		var document = canvas.Document;
+		if (element is null || document is null)
+			return;
+
+		//Like scaling, cropping happens in the element's unrotated frame, and the fixed
+		//opposite edge is pinned at the same document-space point regardless of rotation.
+		var documentCursor = canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document));
+		element.CropTo(element.ToLocal(documentCursor), edge, start);
+
+		var shifted = element.ToDocument(anchor);
+		if (shifted != anchorWorld)
+			element.Position += anchorWorld - shifted;
+
+		document.RaiseChanged();
+	}
+
+	public void Release(Point position)
+	{
+		if (canvas.Selection.SelectedElement is { } element)
+			canvas.Document?.RecordStateChange(element, startState);
+	}
+}
+
 internal sealed class ElementRotateDrag : IPointerDrag
 {
 	private readonly PreviewCanvas canvas;

@@ -1,4 +1,5 @@
 using Avalonia.Input;
+using WhatSchedule.Elements;
 
 namespace WhatSchedule.Controls;
 
@@ -12,6 +13,8 @@ internal static class CanvasCursors
 
 	public static readonly Cursor Move = new(StandardCursorType.SizeAll);
 	public static readonly Cursor Rotate = new(StandardCursorType.Cross);
+	private static readonly Cursor SizeWestEast = new(StandardCursorType.SizeWestEast);
+	private static readonly Cursor SizeNorthSouth = new(StandardCursorType.SizeNorthSouth);
 	public static readonly Cursor HorizontalGuide = new(StandardCursorType.SizeNorthSouth);
 	public static readonly Cursor VerticalGuide = new(StandardCursorType.SizeWestEast);
 
@@ -22,4 +25,6 @@ internal static class CanvasCursors
 		Corner.BottomRight => BottomRight,
 		_ => BottomLeft,
 	};
+
+	public static Cursor ForEdge(Edge edge) => edge is Edge.Left or Edge.Right ? SizeWestEast : SizeNorthSouth;
 }

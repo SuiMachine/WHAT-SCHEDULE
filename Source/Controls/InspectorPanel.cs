@@ -100,7 +100,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddColor(string header, Func<SKColor> getter, Action<SKColor> setter) => AddColor(header, getter, setter);
 	void IInspectorBuilder.AddFontBox(string header, Func<string> getter, Action<string> setter) => AddFontBox(header, getter, setter);
 	void IInspectorBuilder.AddSync(Action sync) => syncCallbacks.Add(sync);
-	void IInspectorBuilder.Apply(Action mutation) => Apply(mutation);
+	void IInspectorBuilder.Apply(string description, Action mutation) => Apply(description, mutation);
 
 	/// <summary>The bring-forward/send-backward buttons, enabled per the element's position in the layering order.</summary>
 	private void AddLayerRow(CanvasElement element)
@@ -145,8 +145,9 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		return -1;
 	}
 
-	/// <summary>Applies <paramref name="mutation"/> to the selected element and records it in the undo history.</summary>
-	private void Apply(Action mutation)
+	/// <summary>Applies <paramref name="mutation"/> to the selected element and records it in the undo
+	/// history as <paramref name="description"/>, which the undo and redo commands then show.</summary>
+	private void Apply(string description, Action mutation)
 	{
 		var document = canvas?.Document;
 		if (element is null || document is null)
@@ -154,7 +155,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 		var before = element.CaptureState();
 		mutation();
-		document.RecordStateChange(element, before);
+		document.RecordStateChange(element, before, description);
 		document.RaiseChanged();
 	}
 
@@ -304,7 +305,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			}
 
 			if (element is not null)
-				canvas?.Document?.RecordStateChange(element, before);
+				canvas?.Document?.RecordStateChange(element, before, header);
 			editStart = null;
 		}
 
@@ -388,7 +389,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			}
 
 			if (element is not null)
-				canvas?.Document?.RecordStateChange(element, before);
+				canvas?.Document?.RecordStateChange(element, before, header);
 			editStart = null;
 		};
 
@@ -403,7 +404,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		combo.SelectionChanged += (_, _) =>
 		{
 			if (combo.SelectedItem is string value && !string.Equals(value, get(), StringComparison.Ordinal))
-				Apply(() => set(value));
+				Apply(header, () => set(value));
 		};
 
 		AddRow(header, combo);
@@ -446,7 +447,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		void Commit()
 		{
 			if (editStart is { } before && element is not null)
-				canvas?.Document?.RecordStateChange(element, before);
+				canvas?.Document?.RecordStateChange(element, before, header);
 			editStart = null;
 		}
 
@@ -483,7 +484,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		var toggle = new ToggleSwitch();
 		void Refresh() => toggle.IsChecked = get();
 		Refresh();
-		toggle.Click += (_, _) => Apply(() => set(toggle.IsChecked == true));
+		toggle.Click += (_, _) => Apply(header, () => set(toggle.IsChecked == true));
 
 		AddRow(header, toggle);
 		syncCallbacks.Add(() => { if (!toggle.IsKeyboardFocusWithin) Refresh(); });
@@ -522,7 +523,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		void CommitDrag()
 		{
 			if (dragStart is { } before && element is not null)
-				canvas?.Document?.RecordStateChange(element, before);
+				canvas?.Document?.RecordStateChange(element, before, header);
 			dragStart = null;
 		}
 
@@ -538,7 +539,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		void CommitTyped()
 		{
 			if (float.TryParse(box.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var typed))
-				Apply(() => set((float)Math.Clamp(typed, minimum, maximum)));
+				Apply(header, () => set((float)Math.Clamp(typed, minimum, maximum)));
 			Refresh();
 		}
 
@@ -614,7 +615,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 				return;
 			}
 
-			Apply(() => set(color));
+			Apply(header, () => set(color));
 			Refresh();
 		}
 
@@ -640,7 +641,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			if (picked is not { } value)
 				return;
 
-			Apply(() => set(picked.Value));
+			Apply(header, () => set(picked.Value));
 			Refresh();
 		};
 		AddRow(header, editor);
@@ -659,7 +660,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		combo.SelectionChanged += (_, _) =>
 		{
 			if (combo.SelectedItem is string family)
-				Apply(() => set(family));
+				Apply(header, () => set(family));
 		};
 
 		AddRow(header, combo);

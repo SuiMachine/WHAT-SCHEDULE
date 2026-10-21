@@ -45,6 +45,9 @@ namespace WhatSchedule.Elements
 
 		public SKBitmap Bitmap { get; }
 
+		/// <summary>The element's kind as shown to the user, e.g. in the undo history.</summary>
+		public override string Kind => ImageElementData.KindName;
+
 		public float Width { get; set; }
 
 		public float Height { get; set; }
@@ -315,7 +318,7 @@ namespace WhatSchedule.Elements
 			builder.AddSync(RefreshRatio);
 
 			var reset = new Button { Content = "Reset Aspect Ratio", HorizontalAlignment = HorizontalAlignment.Stretch };
-			reset.Click += (_, _) => builder.Apply(() =>
+			reset.Click += (_, _) => builder.Apply("Reset Aspect Ratio", () =>
 			{
 				var original = Crop.Height != 0 ? Crop.Width / Crop.Height : 0;
 				Height = (float)Math.Max(ThemeDefinition.MinElementSize, Width / original);
@@ -358,7 +361,7 @@ namespace WhatSchedule.Elements
 			}, 0f);
 
 			var resetCrop = new Button { Content = "Reset Crop", HorizontalAlignment = HorizontalAlignment.Stretch };
-			resetCrop.Click += (_, _) => builder.Apply(() => ApplyCrop(new SKRect(0, 0, Bitmap.Width, Bitmap.Height)));
+			resetCrop.Click += (_, _) => builder.Apply("Reset Crop", () => ApplyCrop(new SKRect(0, 0, Bitmap.Width, Bitmap.Height)));
 			builder.AddRow(string.Empty, resetCrop);
 
 			builder.AddSection("Appearance");

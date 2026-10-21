@@ -76,13 +76,13 @@ public sealed class Document
 	}
 
 	/// <summary>Records an element state change in the undo history, skipping it when the state did not actually change.</summary>
-	public void RecordStateChange(CanvasElement element, CanvasElement.ElementState before)
+	public void RecordStateChange(CanvasElement element, CanvasElement.ElementState before, string description)
 	{
 		var after = element.CaptureState();
 		if (after.Equals(before))
 			return;
 
-		History.Push(new ElementStateAction(element, before, after));
+		History.Push(new ElementStateAction(element, before, after, description));
 	}
 
 	public void RaiseChanged() => Changed?.Invoke();

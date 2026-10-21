@@ -14,6 +14,9 @@ namespace WhatSchedule.Elements;
 /// </summary>
 public sealed class LabelElement : CanvasElement
 {
+	/// <summary>The element's kind as shown to the user, e.g. in the undo history.</summary>
+	public override string Kind => LabelElementData.KindName;
+
 	/// <summary>The named cuts of a font family the style row offers.</summary>
 	private static readonly (string Name, SKFontStyle Style)[] FontStyles =
 	{
@@ -168,7 +171,7 @@ public sealed class LabelElement : CanvasElement
 		builder.AddNumber("Height", () => Size.Height, value => Height = (float)Math.Max(ThemeDefinition.MinElementSize, value));
 
 		builder.AddSection("Text");
-		builder.AddTextArea("Content", () => Text, value => Text = value);
+		builder.AddTextArea("Content change", () => Text, value => Text = value);
 		builder.AddFontBox("Font", () => FontFamily, value => FontFamily = value);
 		builder.AddComboBox("Style", FontStyles.Select(style => style.Name).ToArray(), GetStyleName, SetStyle);
 		builder.AddNumber("Font Size", () => FontSize,
@@ -296,7 +299,7 @@ public sealed class LabelElement : CanvasElement
 					//The dot sits in the cell the button places the text block in.
 					Content = new Ellipse { Width = 4, Height = 4, Fill = ThemeDefinition.RulerLabel, HorizontalAlignment = dotColumns[column], VerticalAlignment = dotRows[row] },
 				};
-				button.Click += (_, _) => builder.Apply(() =>
+				button.Click += (_, _) => builder.Apply("Placement", () =>
 				{
 					Alignment = horizontal;
 					VerticalPlacement = vertical;

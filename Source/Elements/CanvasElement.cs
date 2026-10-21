@@ -18,6 +18,9 @@ public abstract class CanvasElement
 	/// <summary>Current size of the element's bounding box in document pixels.</summary>
 	public abstract SKSize Size { get; }
 
+	/// <summary>The element's kind as shown to the user, e.g. in the undo history.</summary>
+	public abstract string Kind { get; }
+
 	/// <summary>The center the element rotates around, in document pixels.</summary>
 	public SKPoint Center => new(Position.X + Size.Width / 2, Position.Y + Size.Height / 2);
 

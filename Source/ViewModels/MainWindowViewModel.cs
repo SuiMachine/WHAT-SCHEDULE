@@ -150,11 +150,32 @@ public partial class MainWindowViewModel : ObservableObject
 	[RelayCommand]
 	private void Redo() => Document.History.Redo(Document);
 
-	/// <summary>Re-evaluates whether undo and redo can run after the history or the document itself changed.</summary>
+	/// <summary>The undo menu item's text, naming the change it will revert.</summary>
+	public string UndoHeader
+	{
+		get => undoHeader;
+		private set => SetProperty(ref undoHeader, value);
+	}
+
+	private string undoHeader = "Undo";
+
+	/// <summary>The redo menu item's text, naming the change it will re-apply.</summary>
+	public string RedoHeader
+	{
+		get => redoHeader;
+		private set => SetProperty(ref redoHeader, value);
+	}
+
+	private string redoHeader = "Redo";
+
+	/// <summary>Re-evaluates whether undo and redo can run after the history or the document itself changed,
+	/// and re-names both commands after the change they would act on.</summary>
 	private void RefreshHistoryCommands()
 	{
 		UndoCommand.NotifyCanExecuteChanged();
 		RedoCommand.NotifyCanExecuteChanged();
+		UndoHeader = Document.History.UndoDescription is { } undoDescription ? $"Undo {undoDescription}" : "Undo";
+		RedoHeader = Document.History.RedoDescription is { } redoDescription ? $"Redo {redoDescription}" : "Redo";
 	}
 
 	private Document CreateSampleDocument()

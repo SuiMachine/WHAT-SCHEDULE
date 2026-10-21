@@ -49,6 +49,7 @@ public interface IInspectorBuilder
 	/// </summary>
 	void AddSync(Action sync);
 
-	/// <summary>Applies <paramref name="mutation"/> to the selected element and records it in the undo history.</summary>
-	void Apply(Action mutation);
+	/// <summary>Applies <paramref name="mutation"/> to the selected element and records it in the undo
+	/// history as <paramref name="description"/>, which the undo and redo commands then show.</summary>
+	void Apply(string description, Action mutation);
 }

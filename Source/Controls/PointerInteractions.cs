@@ -91,7 +91,7 @@ internal sealed class ElementMoveDrag : IPointerDrag
 
 	public void Release(Point position)
 	{
-		canvas.Document?.RecordStateChange(element, startState);
+		canvas.Document?.RecordStateChange(element, startState, "Move " + element.Kind);
 	}
 }
 
@@ -140,7 +140,7 @@ internal sealed class ElementScaleDrag : IPointerDrag
 	public void Release(Point position)
 	{
 		if (canvas.Selection.SelectedElement is { } element)
-			canvas.Document?.RecordStateChange(element, startState);
+			canvas.Document?.RecordStateChange(element, startState, "Resize " + element.Kind);
 	}
 }
 
@@ -188,7 +188,7 @@ internal sealed class ElementCropDrag : IPointerDrag
 	public void Release(Point position)
 	{
 		if (canvas.Selection.SelectedElement is { } element)
-			canvas.Document?.RecordStateChange(element, startState);
+			canvas.Document?.RecordStateChange(element, startState, "Crop " + element.Kind);
 	}
 }
 
@@ -235,7 +235,7 @@ internal sealed class ElementRotateDrag : IPointerDrag
 
 	public void Release(Point position)
 	{
-		canvas.Document?.RecordStateChange(element, startState);
+		canvas.Document?.RecordStateChange(element, startState, "Rotate " + element.Kind);
 	}
 
 	/// <summary>The angle from the element's center to <paramref name="position"/>, in degrees.</summary>

@@ -60,7 +60,12 @@ public class PreviewCanvas : Control, IDisposable
 	{
 		Focusable = true;
 		Menus = new CanvasMenus(this);
-		Selection.SelectionChanged += () => SelectionChanged?.Invoke();
+
+		Selection.SelectionChanged += () =>
+		{
+			InvalidateVisual();
+			SelectionChanged?.Invoke();
+		};
 		PointerCaptureLost += (_, _) =>
 		{
 			activeDrag = null;

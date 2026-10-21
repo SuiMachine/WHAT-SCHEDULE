@@ -28,6 +28,14 @@ public enum TextAlignment
 	Right,
 }
 
+/// <summary>How the text block is placed vertically within the box it is drawn in.</summary>
+public enum TextVerticalPlacement
+{
+	Top,
+	Middle,
+	Bottom,
+}
+
 public sealed record TextOverlayOptions
 {
 	public required string Text { get; init; }
@@ -53,6 +61,15 @@ public sealed record TextOverlayOptions
 
 	/// <summary>How the lines are placed within the text block's width.</summary>
 	public TextAlignment Alignment { get; init; } = TextAlignment.Left;
+
+	/// <summary>The width the lines are aligned within, e.g. the width of the text box the block is drawn in; null aligns within the measured text width.</summary>
+	public float? AlignmentWidth { get; init; }
+
+	/// <summary>How the text block is placed vertically within the box it is drawn in.</summary>
+	public TextVerticalPlacement VerticalPlacement { get; init; } = TextVerticalPlacement.Top;
+
+	/// <summary>The height the text block is placed within per <see cref="VerticalPlacement"/>; null draws the block at <see cref="Position"/>.</summary>
+	public float? BoxHeight { get; init; }
 
 	public TextTransform Transform { get; init; } = TextTransform.None;
 

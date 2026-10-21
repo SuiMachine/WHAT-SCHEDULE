@@ -33,6 +33,21 @@ public static class ImageTextRenderer
 
 		using var layout = BuildLayout(options);
 
+		//The block is placed within its box: the lines align to the box width, and the
+		//whole block sits at the top, middle or bottom of the box height. Without a box
+		//the block simply starts at Position, aligned to its own measured width.
+		var position = options.Position;
+		if (options.BoxHeight is { } boxHeight)
+		{
+			var offset = options.VerticalPlacement switch
+			{
+				TextVerticalPlacement.Middle => (boxHeight - layout.Height) / 2,
+				TextVerticalPlacement.Bottom => boxHeight - layout.Height,
+				_ => 0f,
+			};
+			position = new SKPoint(position.X, position.Y + offset);
+		}
+
 		//A blend mode other than SrcOver, whole-label opacity and the whole-label blur all
 		//composite the label as one group, so it draws through a layer whose paint carries them.
 		var composited = options.BlendMode != SKBlendMode.SrcOver || options.Opacity < 1 || options.Blur > 0;
@@ -47,11 +62,11 @@ public static class ImageTextRenderer
 			: null;
 		var layer = composited ? canvas.SaveLayer(layerPaint) : 0;
 
-		DrawGlow(canvas, options, layout);
-		DrawShadow(canvas, options, layout);
-		DrawOutline(canvas, options, layout, second: true);
-		DrawOutline(canvas, options, layout, second: false);
-		DrawFill(canvas, options, layout);
+		DrawGlow(canvas, options, layout, position);
+		DrawShadow(canvas, options, layout, position);
+		DrawOutline(canvas, options, layout, position, second: true);
+		DrawOutline(canvas, options, layout, position, second: false);
+		DrawFill(canvas, options, layout, position);
 
 		if (composited)
 			canvas.RestoreToCount(layer);
@@ -128,20 +143,22 @@ public static class ImageTextRenderer
 			width = Math.Max(width, lineWidths[i]);
 		}
 
-		//The alignment places each line within the block's width; the offsets stay outside
-		//the glyph runs, so the same runs serve every alignment without rebuilding.
+		//The alignment places each line within the width it is aligned to: the box width when
+		//the block is drawn into one, else the block's own measured width. The offsets stay
+		//outside the glyph runs, so the same runs serve every alignment without rebuilding.
+		var alignWidth = options.AlignmentWidth ?? width;
 		var offsets = new float[lines.Length];
 		for (var i = 0; i < lines.Length; i++)
 		{
 			offsets[i] = options.Alignment switch
 			{
-				TextAlignment.Center => (width - lineWidths[i]) / 2,
-				TextAlignment.Right => width - lineWidths[i],
+				TextAlignment.Center => (alignWidth - lineWidths[i]) / 2,
+				TextAlignment.Right => alignWidth - lineWidths[i],
 				_ => 0,
 			};
 		}
 
-		return new TextLayout(blobs, offsets, width, lines.Length * lineHeight);
+		return new TextLayout(blobs, offsets, width, alignWidth, lines.Length * lineHeight);
 	}
 
 	private static SKTextBlob? CreateLine(string line, SKFont font, float baseline, float spacing, out float width)
@@ -171,7 +188,7 @@ public static class ImageTextRenderer
 		_ => text,
 	};
 
-	private static void DrawGlow(SKCanvas canvas, TextOverlayOptions options, TextLayout layout)
+	private static void DrawGlow(SKCanvas canvas, TextOverlayOptions options, TextLayout layout, SKPoint position)
 	{
 		if (options.GlowColor.Alpha == 0 || options.GlowBlur <= 0)
 			return;
@@ -182,10 +199,10 @@ public static class ImageTextRenderer
 			IsAntialias = true,
 			ImageFilter = SKImageFilter.CreateBlur(options.GlowBlur, options.GlowBlur),
 		};
-		DrawLines(canvas, layout, options.Position, paint);
+		DrawLines(canvas, layout, position, paint);
 	}
 
-	private static void DrawShadow(SKCanvas canvas, TextOverlayOptions options, TextLayout layout)
+	private static void DrawShadow(SKCanvas canvas, TextOverlayOptions options, TextLayout layout, SKPoint position)
 	{
 		if (options.ShadowColor.Alpha == 0)
 			return;
@@ -197,10 +214,10 @@ public static class ImageTextRenderer
 			BlendMode = options.ShadowBlendMode,
 			ImageFilter = SKImageFilter.CreateBlur(options.ShadowBlur, options.ShadowBlur),
 		};
-		DrawLines(canvas, layout, options.Position + options.ShadowOffset, paint);
+		DrawLines(canvas, layout, position + options.ShadowOffset, paint);
 	}
 
-	private static void DrawOutline(SKCanvas canvas, TextOverlayOptions options, TextLayout layout, bool second)
+	private static void DrawOutline(SKCanvas canvas, TextOverlayOptions options, TextLayout layout, SKPoint position, bool second)
 	{
 		var color = second ? options.SecondOutlineColor : options.OutlineColor;
 		if (color.Alpha == 0 || options.OutlineWidth <= 0)
@@ -227,10 +244,10 @@ public static class ImageTextRenderer
 			StrokeJoin = SKStrokeJoin.Round,
 			StrokeCap = SKStrokeCap.Round,
 		};
-		DrawLines(canvas, layout, options.Position, paint);
+		DrawLines(canvas, layout, position, paint);
 	}
 
-	private static void DrawFill(SKCanvas canvas, TextOverlayOptions options, TextLayout layout)
+	private static void DrawFill(SKCanvas canvas, TextOverlayOptions options, TextLayout layout, SKPoint position)
 	{
 		using var paint = new SKPaint
 		{
@@ -240,9 +257,10 @@ public static class ImageTextRenderer
 
 		if (options.GradientFill)
 		{
-			var center = options.Position + new SKPoint(layout.Width / 2, layout.Height / 2);
+			//The gradient spans the width the lines are aligned to, so it covers the whole box, not just the glyphs.
+			var center = position + new SKPoint(layout.AlignWidth / 2, layout.Height / 2);
 			var radians = options.GradientAngle * MathF.PI / 180f;
-			var vector = new SKPoint(MathF.Cos(radians) * layout.Width / 2, MathF.Sin(radians) * layout.Height / 2);
+			var vector = new SKPoint(MathF.Cos(radians) * layout.AlignWidth / 2, MathF.Sin(radians) * layout.Height / 2);
 			using var shader = SKShader.CreateLinearGradient(
 				center - vector,
 				center + vector,
@@ -252,7 +270,7 @@ public static class ImageTextRenderer
 			paint.Shader = shader;
 		}
 
-		DrawLines(canvas, layout, options.Position, paint);
+		DrawLines(canvas, layout, position, paint);
 	}
 
 	private static void DrawLines(SKCanvas canvas, TextLayout layout, SKPoint position, SKPaint paint)
@@ -265,14 +283,18 @@ public static class ImageTextRenderer
 	}
 
 	/// <summary>The positioned glyph runs of a text block plus its measured size; the shared layout of Measure and Draw.</summary>
-	private sealed class TextLayout(SKTextBlob?[] lines, float[] offsets, float width, float height) : IDisposable
+	private sealed class TextLayout(SKTextBlob?[] lines, float[] offsets, float width, float alignWidth, float height) : IDisposable
 	{
 		public SKTextBlob?[] Lines { get; } = lines;
 
-		/// <summary>Where each line sits within the block's width, per its alignment.</summary>
+		/// <summary>Where each line sits within the width it is aligned to, per its alignment.</summary>
 		public float[] Offsets { get; } = offsets;
 
+		/// <summary>The measured width of the widest line.</summary>
 		public float Width { get; } = width;
+
+		/// <summary>The width the lines are aligned to: the box width when drawn into one, else the measured width.</summary>
+		public float AlignWidth { get; } = alignWidth;
 
 		public float Height { get; } = height;
 

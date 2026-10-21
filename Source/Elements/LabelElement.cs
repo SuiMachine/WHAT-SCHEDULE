@@ -1,4 +1,9 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Layout;
 using SkiaSharp;
 using WhatSchedule.Rendering.Definitions;
 
@@ -49,8 +54,17 @@ public sealed class LabelElement : CanvasElement
 	/// <summary>Line height as a multiple of the font's height; 1 packs the lines tightly.</summary>
 	public float LineHeight { get; set; } = 1f;
 
-	/// <summary>How the lines are placed within the text block's width.</summary>
+	/// <summary>How the lines are placed within the text box's width.</summary>
 	public TextAlignment Alignment { get; set; } = TextAlignment.Left;
+
+	/// <summary>How the text block is placed vertically within the text box.</summary>
+	public TextVerticalPlacement VerticalPlacement { get; set; } = TextVerticalPlacement.Top;
+
+	/// <summary>The width of the box the text is placed in; null sizes the box to the measured text.</summary>
+	public float? Width { get; set; }
+
+	/// <summary>The height of the box the text is placed in; null sizes the box to the measured text.</summary>
+	public float? Height { get; set; }
 
 	/// <summary>Casing applied to the text before rendering; the stored text is unchanged.</summary>
 	public TextTransform Transform { get; set; } = TextTransform.None;
@@ -106,7 +120,17 @@ public sealed class LabelElement : CanvasElement
 
 	public bool FlipY { get; set; }
 
-	public override SKSize Size => ImageTextRenderer.Measure(BuildOptions(SKPoint.Empty));
+	/// <summary>The text box: the stored size once the box was resized or edited, else the measured text size.</summary>
+	public override SKSize Size
+	{
+		get
+		{
+			if (Width is { } width && Height is { } height)
+				return new SKSize(width, height);
+
+			return ImageTextRenderer.Measure(BuildOptions(SKPoint.Empty));
+		}
+	}
 
 	public override void Draw(SKCanvas canvas)
 	{
@@ -115,49 +139,41 @@ public sealed class LabelElement : CanvasElement
 		canvas.RotateDegrees(Rotation, bounds.MidX, bounds.MidY);
 		if (FlipX || FlipY)
 			canvas.Scale(FlipX ? -1 : 1, FlipY ? -1 : 1, bounds.MidX, bounds.MidY);
-		ImageTextRenderer.Draw(canvas, BuildOptions(Position));
+		//The box is where the text is placed: the lines align to its width and the block sits
+		//at its top, middle or bottom. Text wider or taller than the box simply overflows it.
+		ImageTextRenderer.Draw(canvas, BuildOptions(Position, bounds.Size));
 		canvas.RestoreToCount(count);
 	}
 
-	public override ScaleState BeginScale() => new LabelScaleState(Size.Width, FontSize, OutlineWidth, SecondOutlineWidth, LetterSpacing, ShadowBlur, GlowBlur, Blur, ShadowOffset);
+	public override ScaleState BeginScale() => new LabelScaleState();
 
 	public override void ScaleTo(SKPoint cursor, SKPoint anchor, ScaleState state, PointerEventArgs pointerEvent)
 	{
-		if (state is not LabelScaleState start)
+		if (state is not LabelScaleState)
 			return;
 
-		// Labels keep their text proportions: the horizontal drag scales the font
-		// size and the height follows from the measured text. Sizes are applied from
-		// the snapshot taken when the drag started, so the scale never drifts.
-		var width = Math.Max(ThemeDefinition.MinElementSize, Math.Abs(cursor.X - anchor.X));
-		var factor = (float)Math.Max(width / Math.Max(start.Width, 1), ThemeDefinition.MinFontSize / start.FontSize);
-
-		FontSize = start.FontSize * factor;
-		OutlineWidth = start.OutlineWidth * factor;
-		SecondOutlineWidth = start.SecondOutlineWidth * factor;
-		LetterSpacing = start.LetterSpacing * factor;
-		ShadowBlur = start.ShadowBlur * factor;
-		GlowBlur = start.GlowBlur * factor;
-		Blur = start.Blur * factor;
-		ShadowOffset = new SKPoint(start.ShadowOffset.X * factor, start.ShadowOffset.Y * factor);
-
-		var size = Size;
-		Position = new SKPoint(
-			anchor.X <= cursor.X ? anchor.X : anchor.X - size.Width,
-			anchor.Y <= cursor.Y ? anchor.Y : anchor.Y - size.Height);
+		//The drag resizes only the box the text is placed in, like resizing a text field:
+		//the font size is untouched. The sizes are applied straight from the cursor, so a drag never drifts.
+		Width = (float)Math.Max(ThemeDefinition.MinElementSize, Math.Abs(cursor.X - anchor.X));
+		Height = (float)Math.Max(ThemeDefinition.MinElementSize, Math.Abs(cursor.Y - anchor.Y));
+		Position = new SKPoint(Math.Min(anchor.X, cursor.X), Math.Min(anchor.Y, cursor.Y));
 	}
 
-	public override ElementState CaptureState() => new LabelElementState(Position, Rotation, Text, FontFamily, FontStyle, FontSize, LetterSpacing, Stretch, Skew, LineHeight, Alignment, Transform, TextColor, Opacity, GradientFill, GradientColor, GradientAngle, OutlineColor, OutlineWidth, OutlinePosition, SecondOutlineColor, SecondOutlineWidth, ShadowColor, ShadowBlur, ShadowOffset, ShadowBlendMode, GlowColor, GlowBlur, Blur, BlendMode, FlipX, FlipY);
+	public override ElementState CaptureState() => new LabelElementState(Position, Rotation, Width, Height, VerticalPlacement, Text, FontFamily, FontStyle, FontSize, LetterSpacing, Stretch, Skew, LineHeight, Alignment, Transform, TextColor, Opacity, GradientFill, GradientColor, GradientAngle, OutlineColor, OutlineWidth, OutlinePosition, SecondOutlineColor, SecondOutlineWidth, ShadowColor, ShadowBlur, ShadowOffset, ShadowBlendMode, GlowColor, GlowBlur, Blur, BlendMode, FlipX, FlipY);
 
 	public override void BuildInspectorRows(IInspectorBuilder builder)
 	{
+		builder.AddSection("Size");
+		builder.AddNumber("Width", () => Size.Width, value => Width = (float)Math.Max(ThemeDefinition.MinElementSize, value));
+		builder.AddNumber("Height", () => Size.Height, value => Height = (float)Math.Max(ThemeDefinition.MinElementSize, value));
+
 		builder.AddSection("Text");
 		builder.AddTextArea("Content", () => Text, value => Text = value);
 		builder.AddFontBox("Font", () => FontFamily, value => FontFamily = value);
 		builder.AddComboBox("Style", FontStyles.Select(style => style.Name).ToArray(), GetStyleName, SetStyle);
 		builder.AddNumber("Font Size", () => FontSize,
 			value => FontSize = Math.Max(ThemeDefinition.MinFontSize, value));
-		builder.AddComboBox("Alignment", Enum.GetNames<TextAlignment>(), () => Alignment.ToString(), value => Alignment = Enum.Parse<TextAlignment>(value));
+		builder.AddRow("Placement", BuildPlacementGrid(builder));
 		builder.AddSlider("Letter Spacing", 0, 40, () => LetterSpacing, value => LetterSpacing = Math.Max(0, value));
 		builder.AddSlider("Stretch %", 50, 200, () => Stretch, value => Stretch = Math.Clamp(value, 50, 200));
 		builder.AddSlider("Skew", -30, 30, () => Skew, value => Skew = Math.Clamp(value, -30, 30));
@@ -203,6 +219,9 @@ public sealed class LabelElement : CanvasElement
 
 		Position = snapshot.Position;
 		Rotation = snapshot.Rotation;
+		Width = snapshot.Width;
+		Height = snapshot.Height;
+		VerticalPlacement = snapshot.VerticalPlacement;
 		Text = snapshot.Text;
 		FontFamily = snapshot.FontFamily;
 		FontStyle = snapshot.FontStyle;
@@ -243,6 +262,63 @@ public sealed class LabelElement : CanvasElement
 		return clone;
 	}
 
+	/// <summary>A 3x3 grid of buttons placing the text block in its box: the column sets <see cref="Alignment"/>,
+	/// the row sets <see cref="VerticalPlacement"/>. The active cell stays checked, so the current placement is visible.</summary>
+	private Grid BuildPlacementGrid(IInspectorBuilder builder)
+	{
+		var horizontals = new[] { TextAlignment.Left, TextAlignment.Center, TextAlignment.Right };
+		var verticals = new[] { TextVerticalPlacement.Top, TextVerticalPlacement.Middle, TextVerticalPlacement.Bottom };
+		var dotColumns = new[] { HorizontalAlignment.Left, HorizontalAlignment.Center, HorizontalAlignment.Right };
+		var dotRows = new[] { VerticalAlignment.Top, VerticalAlignment.Center, VerticalAlignment.Bottom };
+		var buttons = new ToggleButton[horizontals.Length * verticals.Length];
+
+		var grid = new Grid
+		{
+			ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"),
+			RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+			HorizontalAlignment = HorizontalAlignment.Left,
+		};
+
+		var index = 0;
+		for (var row = 0; row < verticals.Length; row++)
+		{
+			for (var column = 0; column < horizontals.Length; column++, index++)
+			{
+				var horizontal = horizontals[column];
+				var vertical = verticals[row];
+				var button = new ToggleButton
+				{
+					Width = 24,
+					Height = 24,
+					Padding = new Thickness(0),
+					Margin = new Thickness(0, 0, 4, 4),
+					Cursor = new Cursor(StandardCursorType.Hand),
+					//The dot sits in the cell the button places the text block in.
+					Content = new Ellipse { Width = 4, Height = 4, Fill = ThemeDefinition.RulerLabel, HorizontalAlignment = dotColumns[column], VerticalAlignment = dotRows[row] },
+				};
+				button.Click += (_, _) => builder.Apply(() =>
+				{
+					Alignment = horizontal;
+					VerticalPlacement = vertical;
+				});
+				Grid.SetRow(button, row);
+				Grid.SetColumn(button, column);
+				grid.Children.Add(button);
+				buttons[index] = button;
+			}
+		}
+
+		void Refresh()
+		{
+			for (var i = 0; i < buttons.Length; i++)
+				buttons[i].IsChecked = horizontals[i % horizontals.Length] == Alignment && verticals[i / horizontals.Length] == VerticalPlacement;
+		}
+
+		Refresh();
+		builder.AddSync(Refresh);
+		return grid;
+	}
+
 	/// <summary>The name of the offered font style matching the element's weight and slant,
 	/// or the first style when the element carries a cut the row does not offer.</summary>
 	private string GetStyleName() => (FontStyles.FirstOrDefault(style => style.Style.Weight == FontStyle.Weight && style.Style.Slant == FontStyle.Slant).Name ?? FontStyles[0].Name)!;
@@ -250,11 +326,13 @@ public sealed class LabelElement : CanvasElement
 	/// <summary>Sets the element's style from the name of one of the offered font styles.</summary>
 	private void SetStyle(string name) => FontStyle = FontStyles.First(style => style.Name == name).Style;
 
-	private sealed record LabelScaleState(float Width, float FontSize, float OutlineWidth, float SecondOutlineWidth, float LetterSpacing, float ShadowBlur, float GlowBlur, float Blur, SKPoint ShadowOffset) : ScaleState;
+	private sealed record LabelScaleState : ScaleState;
 
-	public sealed record LabelElementState(SKPoint Position, float Rotation, string Text, string FontFamily, SKFontStyle FontStyle, float FontSize, float LetterSpacing, float Stretch, float Skew, float LineHeight, TextAlignment Alignment, TextTransform Transform, SKColor TextColor, float Opacity, bool GradientFill, SKColor GradientColor, float GradientAngle, SKColor OutlineColor, float OutlineWidth, OutlinePosition OutlinePosition, SKColor SecondOutlineColor, float SecondOutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset, SKBlendMode ShadowBlendMode, SKColor GlowColor, float GlowBlur, float Blur, SKBlendMode BlendMode, bool FlipX, bool FlipY) : ElementState;
+	public sealed record LabelElementState(SKPoint Position, float Rotation, float? Width, float? Height, TextVerticalPlacement VerticalPlacement, string Text, string FontFamily, SKFontStyle FontStyle, float FontSize, float LetterSpacing, float Stretch, float Skew, float LineHeight, TextAlignment Alignment, TextTransform Transform, SKColor TextColor, float Opacity, bool GradientFill, SKColor GradientColor, float GradientAngle, SKColor OutlineColor, float OutlineWidth, OutlinePosition OutlinePosition, SKColor SecondOutlineColor, float SecondOutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset, SKBlendMode ShadowBlendMode, SKColor GlowColor, float GlowBlur, float Blur, SKBlendMode BlendMode, bool FlipX, bool FlipY) : ElementState;
 
-	private TextOverlayOptions BuildOptions(SKPoint position) => new()
+	/// <summary>Builds the render options for the label's text; <paramref name="box"/> is the text box the text
+	/// is placed in, or null to treat the measured text itself as the box.</summary>
+	private TextOverlayOptions BuildOptions(SKPoint position, SKSize? box = null) => new()
 	{
 		Text = Text,
 		FontFamily = FontFamily,
@@ -265,6 +343,9 @@ public sealed class LabelElement : CanvasElement
 		Skew = Skew,
 		LineHeight = LineHeight,
 		Alignment = Alignment,
+		AlignmentWidth = box?.Width,
+		BoxHeight = box?.Height,
+		VerticalPlacement = VerticalPlacement,
 		Transform = Transform,
 		TextColor = TextColor,
 		Opacity = Opacity,
@@ -319,6 +400,15 @@ public sealed class LabelElement : CanvasElement
 
 		/// <summary>The text alignment as its name; null in documents saved before alignment existed.</summary>
 		public string? Alignment { get; set; }
+
+		/// <summary>The vertical placement as its name; null in documents saved before text boxes existed.</summary>
+		public string? VerticalPlacement { get; set; }
+
+		/// <summary>The width of the text box; null in documents saved before text boxes existed, sizing the box to the text.</summary>
+		public float? Width { get; set; }
+
+		/// <summary>The height of the text box; null in documents saved before text boxes existed, sizing the box to the text.</summary>
+		public float? Height { get; set; }
 
 		/// <summary>The text transform as its name; null in documents saved before transforms existed.</summary>
 		public string? Transform { get; set; }

@@ -68,10 +68,10 @@ internal sealed class CanvasMenus
 	/// <summary>Enables the layering items when the selected element can actually move in that direction.</summary>
 	private void UpdateLayerMenuItems(Document document)
 	{
-		var elements = document.Elements;
 		var selected = canvas.Selection.SelectedElement;
+		var elements = selected is not null ? document.SiblingsOf(selected) : null;
 		var index = -1;
-		for (var i = 0; i < elements.Count && selected is not null; i++)
+		for (var i = 0; elements is not null && i < elements.Count; i++)
 		{
 			if (ReferenceEquals(elements[i], selected))
 			{
@@ -80,7 +80,7 @@ internal sealed class CanvasMenus
 			}
 		}
 
-		bringForwardItem.IsEnabled = index >= 0 && index < elements.Count - 1;
+		bringForwardItem.IsEnabled = index >= 0 && index < elements!.Count - 1;
 		sendBackwardItem.IsEnabled = index > 0;
 	}
 

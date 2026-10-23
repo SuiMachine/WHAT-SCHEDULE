@@ -73,29 +73,29 @@ namespace WhatSchedule.Documents
 		}
 	}
 
-	/// <summary>An element entering or leaving the document.</summary>
-	internal sealed class ElementCollectionAction(CanvasElement element, int index, bool added) : IHistoryAction
+	/// <summary>An element entering or leaving a container (the document root or a group).</summary>
+	internal sealed class ElementCollectionAction(GroupElement? parent, CanvasElement element, int index, bool added) : IHistoryAction
 	{
 		public string Description => (added ? "Add " : "Delete ") + element.Kind;
 
 		public void Undo(Document document)
 		{
 			if (added)
-				document.RemoveAt(index);
+				document.RemoveAt(parent, index);
 			else
-				document.Insert(element, index);
+				document.Insert(parent, element, index);
 		}
 
 		public void Redo(Document document)
 		{
 			if (added)
-				document.Insert(element, index);
+				document.Insert(parent, element, index);
 			else
-				document.RemoveAt(index);
+				document.RemoveAt(parent, index);
 		}
 	}
 
-	/// <summary>An element moved within the layering order.</summary>
+	/// <summary>An element moved within the layering order of its container.</summary>
 	internal sealed class ElementReorderAction(CanvasElement element, int before, int after) : IHistoryAction
 	{
 		public string Description => "Reorder " + element.Kind;
@@ -103,6 +103,95 @@ namespace WhatSchedule.Documents
 		public void Undo(Document document) => document.MoveTo(element, before);
 
 		public void Redo(Document document) => document.MoveTo(element, after);
+	}
+
+	/// <summary>Where an element sat in the hierarchy and the local transform it carried there.</summary>
+	internal sealed record ElementParentage(GroupElement? Parent, int Index, SkiaSharp.SKPoint Position, float Rotation);
+
+	/// <summary>
+	/// An element moved into or out of a group, with its local transform converted for the new parent and the
+	/// chains' scale difference baked into its extent. When it joined a group, the group's content was rebased
+	/// around its grown box; the recorded shift moves the children left behind back and forth with the move.
+	/// </summary>
+	internal sealed class ElementReparentAction(CanvasElement element, ElementParentage before, ElementParentage after, string description, CanvasElement.ElementState stateBefore, CanvasElement.ElementState stateAfter, GroupElement? rebasedGroup = null, SkiaSharp.SKPoint groupPositionBefore = default, SkiaSharp.SKPoint groupPositionAfter = default, SkiaSharp.SKPoint rebaseDelta = default) : IHistoryAction
+	{
+		public string Description => description;
+
+		public void Undo(Document document)
+		{
+			document.RestoreParentage(element, before.Parent, before.Index, before.Position, before.Rotation);
+			element.RestoreState(stateBefore);
+			if (rebasedGroup is { } group && (rebaseDelta.X != 0 || rebaseDelta.Y != 0))
+			{
+				foreach (var child in group.Children)
+					child.Position += rebaseDelta;
+				group.Position = groupPositionBefore;
+			}
+		}
+
+		public void Redo(Document document)
+		{
+			if (rebasedGroup is { } group && (rebaseDelta.X != 0 || rebaseDelta.Y != 0))
+			{
+				foreach (var child in group.Children)
+					child.Position -= rebaseDelta;
+				group.Position = groupPositionAfter;
+			}
+
+			document.RestoreParentage(element, after.Parent, after.Index, after.Position, after.Rotation);
+			element.RestoreState(stateAfter);
+		}
+	}
+
+	/// <summary>A group created around two elements; undoing it unpacks the children and removes the group.</summary>
+	internal sealed class GroupCreationAction(GroupElement group, CanvasElement first, CanvasElement second, GroupElement? container, int index, ElementParentage firstBefore, ElementParentage secondBefore, ElementParentage firstAfter, ElementParentage secondAfter, string description) : IHistoryAction
+	{
+		public string Description => description;
+
+		public void Undo(Document document)
+		{
+			//The group goes first so the children restore into the container exactly as it was before; its
+			//index was captured with the children already out of the container. The lower old index is
+			//restored first, since the higher slot only lines up once every element below it is back.
+			document.RemoveAt(container, index);
+			if (firstBefore.Index <= secondBefore.Index)
+			{
+				document.RestoreParentage(first, firstBefore.Parent, firstBefore.Index, firstBefore.Position, firstBefore.Rotation);
+				document.RestoreParentage(second, secondBefore.Parent, secondBefore.Index, secondBefore.Position, secondBefore.Rotation);
+			}
+			else
+			{
+				document.RestoreParentage(second, secondBefore.Parent, secondBefore.Index, secondBefore.Position, secondBefore.Rotation);
+				document.RestoreParentage(first, firstBefore.Parent, firstBefore.Index, firstBefore.Position, firstBefore.Rotation);
+			}
+		}
+
+		public void Redo(Document document)
+		{
+			//The children move back into the group before it is inserted, so its captured index in the
+			//container is the one it had with the children already inside it.
+			document.RestoreParentage(first, firstAfter.Parent, firstAfter.Index, firstAfter.Position, firstAfter.Rotation);
+			document.RestoreParentage(second, secondAfter.Parent, secondAfter.Index, secondAfter.Position, secondAfter.Rotation);
+			document.Insert(container, group, index);
+		}
+	}
+
+	/// <summary>An element renamed in the hierarchy; a null name is the element's kind fallback.</summary>
+	internal sealed class ElementRenameAction(CanvasElement element, string? before, string? after) : IHistoryAction
+	{
+		public string Description => "Rename " + element.Kind;
+
+		public void Undo(Document document)
+		{
+			element.Name = before;
+			document.RaiseChanged();
+		}
+
+		public void Redo(Document document)
+		{
+			element.Name = after;
+			document.RaiseChanged();
+		}
 	}
 
 	/// <summary>An element whose state changed (e.g. by moving or scaling it).</summary>

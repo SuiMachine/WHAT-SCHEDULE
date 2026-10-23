@@ -50,6 +50,12 @@ public class PreviewCanvas : Control, IDisposable
 	/// <summary>The gap between pasted elements, in document pixels.</summary>
 	private const float PasteStep = 20f;
 
+	/// <summary>
+	/// The group the canvas was drilled into by double-clicking it or selecting its child elsewhere
+	/// (e.g. in the hierarchy): single clicks pick elements inside it directly instead of the whole group.
+	/// </summary>
+	internal GroupElement? DrillGroup { get; set; }
+
 	/// <summary>Raised after the element selected on the canvas changed.</summary>
 	internal event Action? SelectionChanged;
 
@@ -132,13 +138,13 @@ public class PreviewCanvas : Control, IDisposable
 		}
 	}
 
-	/// <summary>Copies the selected element to the internal clipboard; Ctrl+C and Edit &gt; Copy.</summary>
+	/// <summary>Copies the selected element to the internal clipboard, converting its local transform to the document root; Ctrl+C and Edit &gt; Copy.</summary>
 	public bool CopySelection()
 	{
 		if (Selection.SelectedElement is not { } element)
 			return false;
 
-		clipboardElement = element.Clone();
+		clipboardElement = CloneAsRoot(element);
 		pasteCount = 0;
 		return true;
 	}
@@ -146,12 +152,37 @@ public class PreviewCanvas : Control, IDisposable
 	/// <summary>Copies the selected element to the internal clipboard and removes it from the document; Ctrl+X and Edit &gt; Cut.</summary>
 	public bool CutSelection()
 	{
-		if (Document is not { } document || Selection.SelectedElement is not { } element || !document.RemoveTracked(element))
+		if (Document is not { } document || Selection.SelectedElement is not { } element)
 			return false;
 
-		clipboardElement = element.Clone();
+		//The clone must be taken while the element still sits in its group, so its local transform can be converted to the root.
+		var clone = CloneAsRoot(element);
+		if (!document.RemoveTracked(element))
+			return false;
+
+		clipboardElement = clone;
 		pasteCount = 0;
 		return true;
+	}
+
+	/// <summary>A copy of <paramref name="element"/> carrying its transform in document space, as it would sit at the root.</summary>
+	private static CanvasElement CloneAsRoot(CanvasElement element)
+	{
+		var clone = element.Clone();
+		if (element.Parent is not null)
+		{
+			//The clone must be taken while the element still sits in its group, so its local transform can be
+			//converted to the root. Like Reparent, the pivot carries the transform and the chain's scale is
+			//baked into the clone's extent, so the copy keeps both its rendered place and its rendered size.
+			var anchor = element.PivotInParent;
+			var offset = anchor - element.Position;
+			var scale = CanvasElement.AncestorScale(element.Parent);
+			clone.BakeScale(scale);
+			clone.Rotation = element.Rotation + element.ParentRotation;
+			clone.Position = element.ParentToDocument(anchor) - new SKPoint(offset.X * scale.X, offset.Y * scale.Y);
+		}
+
+		return clone;
 	}
 
 	/// <summary>Pastes the clipboard element in the top left corner, every paste one step further away; Ctrl+V and Edit &gt; Paste.</summary>
@@ -191,6 +222,8 @@ public class PreviewCanvas : Control, IDisposable
 	private void OnDocumentChanged()
 	{
 		Selection.SyncWithDocument(Document);
+		if (DrillGroup is not null && Document is { } document && !document.ContainsElement(DrillGroup))
+			DrillGroup = null;
 		Surface.MarkDirty();
 		InvalidateVisual();
 		DocumentChanged?.Invoke();
@@ -227,7 +260,7 @@ public class PreviewCanvas : Control, IDisposable
 		if (document is null || document.Width <= 0 || document.Height <= 0 || !point.Properties.IsLeftButtonPressed)
 			return;
 
-		var drag = BeginDrag(point.Position, e.KeyModifiers);
+		var drag = BeginDrag(point.Position, e.KeyModifiers, e.ClickCount);
 		if (drag is null)
 			return;
 
@@ -241,7 +274,7 @@ public class PreviewCanvas : Control, IDisposable
 	}
 
 	/// <summary>Runs the hit-test chain and returns the drag interaction it starts, falling back to panning.</summary>
-	private IPointerDrag BeginDrag(Point position, KeyModifiers modifiers)
+	private IPointerDrag BeginDrag(Point position, KeyModifiers modifiers, int clickCount)
 	{
 		var document = Document!;
 		var imageRect = GetImageRect(document);
@@ -263,10 +296,11 @@ public class PreviewCanvas : Control, IDisposable
 			if (guide is not null)
 				return new GuideDrag(this, guide);
 
-			if (HitTestElement(position) is { } element)
+			if (HitTestElement(position) is { } hit)
 			{
-				Selection.SelectedElement = element;
-				return new ElementMoveDrag(this, element, position);
+				var target = ResolveSelection(hit, clickCount >= 2);
+				Selection.SelectedElement = target;
+				return new ElementMoveDrag(this, target, position);
 			}
 		}
 
@@ -277,6 +311,42 @@ public class PreviewCanvas : Control, IDisposable
 		}
 
 		return new PanDrag(this, position);
+	}
+
+	/// <summary>
+	/// What a canvas click selects: a plain click selects the outermost group around the hit element
+	/// (the element itself when ungrouped), a double click drills into the group and selects the hit
+	/// element directly, and once drilled in, plain clicks keep picking elements inside that group.
+	/// </summary>
+	private CanvasElement ResolveSelection(CanvasElement hit, bool drillIn)
+	{
+		if (drillIn)
+		{
+			DrillGroup = hit as GroupElement ?? hit.Parent;
+			return hit;
+		}
+
+		if (DrillGroup is not null && IsWithin(DrillGroup, hit))
+			return hit;
+
+		var outer = hit;
+		while (outer.Parent is not null)
+			outer = outer.Parent;
+
+		DrillGroup = null;
+		return outer;
+	}
+
+	/// <summary>Whether <paramref name="element"/> is <paramref name="ancestor"/> itself or anywhere inside it.</summary>
+	private static bool IsWithin(GroupElement ancestor, CanvasElement element)
+	{
+		for (var current = element; current is not null; current = current.Parent)
+		{
+			if (ReferenceEquals(current, ancestor))
+				return true;
+		}
+
+		return false;
 	}
 
 	protected override void OnPointerMoved(PointerEventArgs e)
@@ -361,13 +431,30 @@ public class PreviewCanvas : Control, IDisposable
 			return null;
 
 		var point = Viewport.ScreenToDocument(position, GetImageRect(document));
-		for (var i = document.Elements.Count - 1; i >= 0; i--)
+		for (var i = document.RootElements.Count - 1; i >= 0; i--)
 		{
-			if (document.Elements[i].Contains(point))
-				return document.Elements[i];
+			if (HitTest(document.RootElements[i], point) is { } element)
+				return element;
 		}
 
 		return null;
+	}
+
+	/// <summary>The topmost element at <paramref name="point"/> (in document pixels): a group's children are hit first, and the empty space inside a group's frame picks the group itself.</summary>
+	private static CanvasElement? HitTest(CanvasElement element, SKPoint point)
+	{
+		if (element is GroupElement group)
+		{
+			for (var i = group.Children.Count - 1; i >= 0; i--)
+			{
+				if (HitTest(group.Children[i], point) is { } child)
+					return child;
+			}
+
+			return group.Contains(point) ? group : null;
+		}
+
+		return element.Contains(point) ? element : null;
 	}
 
 	protected override void OnPointerWheelChanged(PointerWheelEventArgs e)

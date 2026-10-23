@@ -43,7 +43,7 @@ internal sealed class SelectionLayer
 	/// <summary>Drops the selection when the document no longer contains it (e.g. a new background was loaded).</summary>
 	public void SyncWithDocument(Document? document)
 	{
-		if (SelectedElement is not null && document is not null && !document.Elements.Contains(SelectedElement))
+		if (SelectedElement is not null && document is not null && !document.ContainsElement(SelectedElement))
 			SelectedElement = null;
 	}
 
@@ -53,7 +53,7 @@ internal sealed class SelectionLayer
 		if (element is null)
 			return null;
 
-		var bounds = element.Bounds;
+		var bounds = element.ContentBounds;
 		foreach (var corner in AllCorners)
 		{
 			var screen = ToScreen(element.ToDocument(GetCorner(bounds, corner)), imageRect, scale);
@@ -158,8 +158,9 @@ internal sealed class SelectionLayer
 	/// <summary>The document-space position of the rotation handle, floating above the middle of the element's top edge at a constant screen distance.</summary>
 	public static SKPoint GetRotateHandle(CanvasElement element, double scale)
 	{
-		var bounds = element.Bounds;
-		var radians = element.Rotation * Math.PI / 180;
+		var bounds = element.ContentBounds;
+		//The handle floats perpendicular to the edge as it is seen, so the whole ancestor rotation counts, not just the element's own.
+		var radians = (element.Rotation + element.ParentRotation) * Math.PI / 180;
 		var offset = (float)(ThemeDefinition.RotateHandleOffset / Math.Max(scale, 0.01));
 		var outward = new SKPoint(
 			(float)(Math.Sin(radians) * offset),
@@ -172,7 +173,7 @@ internal sealed class SelectionLayer
 		if (SelectedElement is not { } element)
 			return;
 
-		var bounds = element.Bounds;
+		var bounds = element.ContentBounds;
 
 		//The selection box rotates with the element.
 		var box = new StreamGeometry();

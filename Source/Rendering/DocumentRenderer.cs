@@ -37,7 +37,8 @@ public static class DocumentRenderer
 			return;
 
 		canvas.DrawBitmap(background, 0, 0);
-		foreach (var element in document.Elements)
+		//Groups draw their own children inside their transform, so only the roots are drawn here.
+		foreach (var element in document.RootElements)
 		{
 			element.Draw(canvas);
 		}

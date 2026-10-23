@@ -17,11 +17,14 @@ public sealed class LabelElement : CanvasElement
 	/// <summary>The element's kind as shown to the user, e.g. in the undo history.</summary>
 	public override string Kind => LabelElementData.KindName;
 
-	/// <summary>The first non-empty line of the label text, or its kind when there is none, as shown in the hierarchy list.</summary>
+	/// <summary>The user-given name, or the first non-empty line of the label text, or its kind when there is neither, as shown in the hierarchy list.</summary>
 	public override string DisplayName
 	{
 		get
 		{
+			if (Name is not null)
+				return Name;
+
 			var line = Text.Split('\n').Select(part => part.Trim()).FirstOrDefault(part => part.Length > 0);
 			return line ?? Kind;
 		}
@@ -170,6 +173,21 @@ public sealed class LabelElement : CanvasElement
 		Width = (float)Math.Max(ThemeDefinition.MinElementSize, Math.Abs(cursor.X - anchor.X));
 		Height = (float)Math.Max(ThemeDefinition.MinElementSize, Math.Abs(cursor.Y - anchor.Y));
 		Position = new SKPoint(Math.Min(anchor.X, cursor.X), Math.Min(anchor.Y, cursor.Y));
+	}
+
+	/// <summary>Scales the text and its box: the font and every length the text is styled with follow the horizontal factor, the box follows both axes.</summary>
+	internal override void BakeScale(SKPoint factor)
+	{
+		FontSize *= factor.X;
+		LetterSpacing *= factor.X;
+		OutlineWidth *= factor.X;
+		SecondOutlineWidth *= factor.X;
+		ShadowBlur *= factor.X;
+		GlowBlur *= factor.X;
+		Blur *= factor.X;
+		ShadowOffset = new SKPoint(ShadowOffset.X * factor.X, ShadowOffset.Y * factor.Y);
+		Width *= factor.X;
+		Height *= factor.Y;
 	}
 
 	public override ElementState CaptureState() => new LabelElementState(Position, Rotation, Width, Height, VerticalPlacement, Text, FontFamily, FontStyle, FontSize, LetterSpacing, Stretch, Skew, LineHeight, Alignment, Transform, TextColor, Opacity, GradientFill, GradientColor, GradientAngle, OutlineColor, OutlineWidth, OutlinePosition, SecondOutlineColor, SecondOutlineWidth, ShadowColor, ShadowBlur, ShadowOffset, ShadowBlendMode, GlowColor, GlowBlur, Blur, BlendMode, FlipX, FlipY);

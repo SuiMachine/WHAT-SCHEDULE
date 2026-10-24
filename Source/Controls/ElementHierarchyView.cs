@@ -173,8 +173,8 @@ public sealed class ElementHierarchyView : Control
 			return;
 		}
 
-		var selected = canvas?.Selection.SelectedElement;
-		var viewportHeight = Math.Max(0, bounds.Height - ListTop);
+		CanvasElement? selected = canvas?.Selection.SelectedElement;
+		double viewportHeight = Math.Max(0, bounds.Height - ListTop);
 		scrollOffset = Math.Clamp(scrollOffset, 0, Math.Max(0, rows.Count * RowHeight - viewportHeight));
 
 		using (context.PushClip(new Rect(0, ListTop, bounds.Width, viewportHeight)))

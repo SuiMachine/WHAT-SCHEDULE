@@ -65,7 +65,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 		Children.Add(new TextBlock
 		{
-			Text = element is GroupElement ? "Group" : element is LabelElement ? "Label" : "Image",
+			Text = element.Kind,
 			FontWeight = FontWeight.Bold,
 			Margin = new Thickness(0, 0, 0, 8),
 		});

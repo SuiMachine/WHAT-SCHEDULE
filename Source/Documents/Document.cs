@@ -274,8 +274,7 @@ public sealed class Document
 	}
 
 	/// <summary>Where <paramref name="element"/> currently sits in the hierarchy and what local transform it carries there.</summary>
-	private ElementParentage CaptureParentage(CanvasElement element) =>
-		new(element.Parent, IndexOf(element), element.Position, element.Rotation);
+	private ElementParentage CaptureParentage(CanvasElement element) => new(element.Parent, IndexOf(element), element.Position, element.Rotation);
 
 	/// <summary>Adds a guide line without recording it in the undo history.</summary>
 	public void AddGuide(Guide guide)

@@ -3,6 +3,7 @@ using Avalonia.Input;
 using SkiaSharp;
 using WhatSchedule.Documents;
 using WhatSchedule.Elements;
+using WhatSchedule.Extensions;
 
 namespace WhatSchedule.Controls;
 
@@ -89,6 +90,10 @@ internal sealed class ElementMoveDrag : IPointerDrag
 			(float)((position.X - startPosition.X) / scale),
 			(float)((position.Y - startPosition.Y) / scale));
 		element.Position = element.DocumentToParent(startAnchor + delta);
+
+		if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+			element.Position = element.Position.Snap();
+
 		document.RaiseChanged();
 	}
 

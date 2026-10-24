@@ -275,6 +275,16 @@ namespace WhatSchedule.Elements
 			return new SKRect(left, top, right, bottom);
 		}
 
+		/// <summary>Scales the frame and its attached lengths; the crop stays in bitmap pixels, so the cropped picture scales with the frame.</summary>
+		internal override void BakeScale(SKPoint factor)
+		{
+			Width *= factor.X;
+			Height *= factor.Y;
+			CornerRadius *= factor.X;
+			ShadowBlur *= factor.X;
+			ShadowOffset = new SKPoint(ShadowOffset.X * factor.X, ShadowOffset.Y * factor.Y);
+		}
+
 		public override ElementState CaptureState() => new ImageElementState(Position, Rotation, Width, Height, Crop, Opacity, CornerRadius, FlipX, FlipY, ShadowColor, ShadowBlur, ShadowOffset, TintColor, TintMode, BlendMode);
 
 		public override void RestoreState(ElementState state)

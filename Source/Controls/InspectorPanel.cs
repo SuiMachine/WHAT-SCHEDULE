@@ -65,7 +65,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 		Children.Add(new TextBlock
 		{
-			Text = element is LabelElement ? "Label" : "Image",
+			Text = element.Kind,
 			FontWeight = FontWeight.Bold,
 			Margin = new Thickness(0, 0, 0, 8),
 		});
@@ -119,7 +119,8 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 		void RefreshLayering()
 		{
-			var elements = canvas?.Document?.Elements;
+			//Layering moves an element within its own container: its group, or the document root.
+			var elements = canvas?.Document?.SiblingsOf(element);
 			var index = IndexOf(element, elements);
 			backward.IsEnabled = index > 0;
 			forward.IsEnabled = index >= 0 && index < elements!.Count - 1;

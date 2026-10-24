@@ -46,7 +46,7 @@ namespace WhatSchedule.Documents
 		{
 			Background = EncodePng(document.Background),
 			Guides = new List<Guide>(document.Guides),
-			Elements = document.Elements.Select(ToData).ToList(),
+			Elements = document.RootElements.Select(ToData).ToList(),
 		};
 
 		private static Document FromData(DocumentData data)
@@ -65,8 +65,18 @@ namespace WhatSchedule.Documents
 
 		private static CanvasElement.ElementData ToData(CanvasElement element) => element switch
 		{
+			GroupElement group => new GroupElement.GroupElementData
+			{
+				Name = element.Name,
+				Position = ToData(group.Position),
+				Rotation = group.Rotation,
+				ScaleX = group.ScaleX,
+				ScaleY = group.ScaleY,
+				Children = group.Children.Select(ToData).ToList()
+			},
 			LabelElement label => new LabelElement.LabelElementData
 			{
+				Name = element.Name,
 				Position = ToData(label.Position),
 				Rotation = label.Rotation,
 				Text = label.Text,
@@ -106,6 +116,7 @@ namespace WhatSchedule.Documents
 			},
 			ImageElement image => new ImageElement.ImageElementData
 			{
+				Name = element.Name,
 				Position = ToData(image.Position),
 				Rotation = image.Rotation,
 				Png = EncodePng(image.Bitmap),
@@ -131,12 +142,23 @@ namespace WhatSchedule.Documents
 
 		private static CanvasElement FromData(CanvasElement.ElementData data)
 		{
-			if (data.Position is not { } position)
-				throw new JsonSerializationException("An element is missing its position.");
-
+			var position = data.Position;
 			CanvasElement element;
 			switch (data)
 			{
+				case GroupElement.GroupElementData group:
+					{
+						var restored = new GroupElement
+						{
+							Position = ToSKPoint(position),
+							ScaleX = group.ScaleX,
+							ScaleY = group.ScaleY
+						};
+						foreach (var child in group.Children)
+							restored.InsertChild(FromData(child), restored.Children.Count);
+						element = restored;
+						break;
+					}
 				case LabelElement.LabelElementData label:
 					{
 						element = new LabelElement
@@ -209,7 +231,8 @@ namespace WhatSchedule.Documents
 					throw new JsonSerializationException($"Unknown element kind '{data.Kind}'.");
 			}
 
-			element.Rotation = data.Rotation ?? 0f;
+			element.Rotation = data.Rotation;
+			element.Name = data.Name;
 			return element;
 		}
 
@@ -265,6 +288,7 @@ namespace WhatSchedule.Documents
 				{
 					LabelElement.LabelElementData.KindName => new LabelElement.LabelElementData(),
 					ImageElement.ImageElementData.KindName => new ImageElement.ImageElementData(),
+					GroupElement.GroupElementData.KindName => new GroupElement.GroupElementData(),
 					_ => throw new JsonSerializationException($"Unknown element kind '{kind}'.")
 				};
 

@@ -2,72 +2,37 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Media.Immutable;
+using Avalonia.Threading;
 using System.Globalization;
+using WhatSchedule.Controls.Dialogs;
 using WhatSchedule.Documents;
 using WhatSchedule.Elements;
+using static WhatSchedule.ThemeDefinition.HierarchyView;
 
 namespace WhatSchedule.Controls;
 
 /// <summary>
-/// The list of the document's elements in the order they are rendered, topmost first, docked under
-/// the inspector. The top edge resizes the view, clicking a row selects the element on the canvas,
-/// and dragging a row to another position changes the rendering order, recorded in the document's
-/// undo history.
+/// The document's element tree, docked under the inspector: the topmost element of each container is
+/// listed first with a group's children indented below it. The top edge resizes the view, clicking a
+/// row selects the element on the canvas, and dragging a row either reorders it (dropped between rows),
+/// moves it into or out of a group (dropped between rows at another level), or drops it onto a row:
+/// onto a group it joins that group, onto a plain element the two are wrapped in a new group. Right-clicking
+/// a row opens a menu that renames or deletes its element. Every change is recorded in the document's undo history.
 /// </summary>
 public sealed class ElementHierarchyView : Control
 {
-	/// <summary>The height of the resize band at the top edge, in pixels.</summary>
-	private const double GripHeight = 6;
-
-	/// <summary>The height of the header band between the resize band and the list, in pixels.</summary>
-	private const double HeaderHeight = 20;
-
-	/// <summary>The distance of the first row from the top edge, in pixels.</summary>
-	private const double ListTop = GripHeight + HeaderHeight;
-
-	/// <summary>The height of one element row, in pixels.</summary>
-	private const double RowHeight = 20;
-
-	/// <summary>The font size of the header and the element names.</summary>
-	private const double FontSize = 12;
-
-	/// <summary>The horizontal padding of the drawn texts, in pixels.</summary>
-	private const double TextPadding = 8;
-
-	/// <summary>How far the pointer must move before a pressed row turns into a drag, in pixels.</summary>
-	private const double DragThreshold = 3;
-
-	/// <summary>The smallest height the top edge can shrink the view to, in pixels.</summary>
-	private const double MinViewHeight = 80;
-
-	/// <summary>The height left to the inspector above when the view is grown the largest, in pixels.</summary>
-	private const double MinSiblingHeight = 120;
-
-	/// <summary>The highlight of the row of the element selected on the canvas.</summary>
-	private static readonly ISolidColorBrush SelectedRowFill = new ImmutableSolidColorBrush(ThemeDefinition.Selection.Color, 0.2);
-
-	/// <summary>The highlight of the row under the pointer.</summary>
-	private static readonly ISolidColorBrush HoverRowFill = new ImmutableSolidColorBrush(Colors.White, 0.13);
-
-	/// <summary>The pen of the lines separating the bands and the rows.</summary>
-	private static readonly IPen SeparatorPen = new Pen(ThemeDefinition.Border, 1);
-
-	/// <summary>The pen of the insertion line shown while a row is dragged.</summary>
-	private static readonly IPen InsertionPen = new Pen(ThemeDefinition.Selection, 1);
-
-	private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
-	private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeNorthSouth);
-
-	private static readonly FormattedText HeaderLabel = new("Elements", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeDefinition.LabelTypeface, FontSize, ThemeDefinition.RulerLabel);
-
-	/// <summary>The hint shown while the document has no elements, e.g. before a schedule is loaded.</summary>
-	private static readonly FormattedText EmptyHint = new("No elements.", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeDefinition.LabelTypeface, FontSize, ThemeDefinition.RulerTick);
-
-	private static readonly FormattedText Ellipsis = new("…", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeDefinition.LabelTypeface, FontSize, ThemeDefinition.RulerLabel);
+	/// <summary>One display row of the tree: the element, its nesting depth, its container and its position in the container's rendering order.</summary>
+	private sealed record HierarchyRow(CanvasElement Element, int Depth, GroupElement? Container, int DrawIndex);
 
 	private PreviewCanvas? canvas;
+	private readonly List<HierarchyRow> rows = new();
 	private readonly List<FormattedText> labels = new();
+
+	/// <summary>The rename and delete menu opened by right-clicking a row; it acts on the element it was opened for.</summary>
+	private readonly ContextMenu rowMenu;
+
+	/// <summary>The element the row menu was opened for, kept because the menu outlives the rows it was built from.</summary>
+	private CanvasElement? menuElement;
 
 	/// <summary>The vertical scroll offset of the list, in pixels, when it outgrows the view.</summary>
 	private double scrollOffset;
@@ -78,7 +43,13 @@ public sealed class ElementHierarchyView : Control
 	/// <summary>The row being dragged, in display order, or -1 when no drag is running.</summary>
 	private int dragRow = -1;
 
-	/// <summary>The display boundary the dragged row would land on when released, or -1 before the drag threshold is crossed.</summary>
+	/// <summary>The element of the row being dragged, kept because <see cref="dragRow"/> goes away with the drag.</summary>
+	private CanvasElement? dragElement;
+
+	/// <summary>The row the dragged element would be dropped onto, or null while it is not over a row's drop band.</summary>
+	private HierarchyRow? dropRow;
+
+	/// <summary>The display boundary the dragged row would land on when released, or -1 before the drag threshold is crossed or while over a drop band.</summary>
 	private int dragTarget = -1;
 
 	/// <summary>The pointer position where the pressed row started, to tell a click from a drag.</summary>
@@ -96,12 +67,27 @@ public sealed class ElementHierarchyView : Control
 	/// <summary>Whether the pointer currently hovers the resize band.</summary>
 	private bool gripHover;
 
+	/// <summary>Whether the pointer currently hovers the new group button in the header band.</summary>
+	private bool buttonHover;
+
 	public ElementHierarchyView()
 	{
+		var renameItem = new MenuItem { Header = "Rename..." };
+		renameItem.Click += async (_, _) => await RenameElementAsync();
+
+		var deleteItem = new MenuItem { Header = "Delete" };
+		deleteItem.Click += (_, _) => DeleteElement();
+
+		rowMenu = new ContextMenu();
+		rowMenu.Items.Add(renameItem);
+		rowMenu.Items.Add(deleteItem);
+
 		//A lost capture (a dialog opening, the window losing focus) must not leave a drag or resize half-finished.
 		PointerCaptureLost += (_, _) =>
 		{
 			dragRow = -1;
+			dragElement = null;
+			dropRow = null;
 			dragTarget = -1;
 			resizing = false;
 			InvalidateVisual();
@@ -128,23 +114,43 @@ public sealed class ElementHierarchyView : Control
 			Refresh();
 	}
 
-	/// <summary>Rebuilds the element names from the current document; the selected row is matched live while rendering.</summary>
+	/// <summary>Rebuilds the element rows from the current document; the selected row is matched live while rendering.</summary>
 	private void Refresh()
 	{
+		rows.Clear();
 		labels.Clear();
 		hoveredRow = -1;
 		dragRow = -1;
+		dragElement = null;
+		dropRow = null;
 		dragTarget = -1;
 
-		var elements = canvas?.Document?.Elements;
-		if (elements is not null)
-		{
-			//The list shows the topmost element first, i.e. the reverse of the rendering order.
-			for (var i = elements.Count - 1; i >= 0; i--)
-				labels.Add(new FormattedText(elements[i].DisplayName, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeDefinition.LabelTypeface, FontSize, ThemeDefinition.RulerLabel));
-		}
+		var roots = canvas?.Document?.RootElements;
+		if (roots is not null)
+			Build(roots, null, 0);
 
 		InvalidateVisual();
+	}
+
+	/// <summary>Adds the container's elements topmost first, a group's children indented below its own row.</summary>
+	private void Build(IReadOnlyList<CanvasElement> container, GroupElement? parent, int depth)
+	{
+		for (var i = container.Count - 1; i >= 0; i--)
+		{
+			var element = container[i];
+			rows.Add(new HierarchyRow(element, depth, parent, i));
+			labels.Add(CreateLabel(element));
+
+			if (element is GroupElement group)
+				Build(group.Children, group, depth + 1);
+		}
+	}
+
+	/// <summary>The row's display name; group rows are bold so containers stand out from their contents.</summary>
+	private static FormattedText CreateLabel(CanvasElement element)
+	{
+		var typeface = element is GroupElement ? GroupTypeface : ThemeDefinition.LabelTypeface;
+		return new FormattedText(element.DisplayName, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, FontSize, ThemeDefinition.RulerLabel);
 	}
 
 	public override void Render(DrawingContext context)
@@ -158,44 +164,47 @@ public sealed class ElementHierarchyView : Control
 			context.DrawLine(InsertionPen, new Point(0, GripHeight - 0.5), new Point(bounds.Width, GripHeight - 0.5));
 
 		context.DrawText(HeaderLabel, new Point(TextPadding, GripHeight + (HeaderHeight - HeaderLabel.Height) / 2));
+		DrawNewGroupButton(context, bounds.Size);
 		context.DrawLine(SeparatorPen, new Point(0, ListTop - 0.5), new Point(bounds.Width, ListTop - 0.5));
 
-		if (labels.Count == 0)
+		if (rows.Count == 0)
 		{
 			context.DrawText(EmptyHint, new Point(TextPadding, ListTop + 4));
 			return;
 		}
 
-		var selected = canvas?.Selection.SelectedElement;
-		var elements = canvas?.Document?.Elements;
-		var viewportHeight = Math.Max(0, bounds.Height - ListTop);
-		scrollOffset = Math.Clamp(scrollOffset, 0, Math.Max(0, labels.Count * RowHeight - viewportHeight));
+		CanvasElement? selected = canvas?.Selection.SelectedElement;
+		double viewportHeight = Math.Max(0, bounds.Height - ListTop);
+		scrollOffset = Math.Clamp(scrollOffset, 0, Math.Max(0, rows.Count * RowHeight - viewportHeight));
 
 		using (context.PushClip(new Rect(0, ListTop, bounds.Width, viewportHeight)))
 		{
 			var firstRow = (int)Math.Floor(scrollOffset / RowHeight);
-			var lastRow = Math.Min(labels.Count - 1, (int)Math.Floor((scrollOffset + viewportHeight) / RowHeight));
+			var lastRow = Math.Min(rows.Count - 1, (int)Math.Floor((scrollOffset + viewportHeight) / RowHeight));
 			for (var row = firstRow; row <= lastRow; row++)
 			{
 				var top = ListTop + row * RowHeight - scrollOffset;
 				var rowBounds = new Rect(0, top, bounds.Width, RowHeight);
 
-				if (elements is not null && ReferenceEquals(elements[elements.Count - 1 - row], selected))
+				if (ReferenceEquals(rows[row].Element, selected))
 					context.FillRectangle(SelectedRowFill, rowBounds);
+				else if (dropRow is { } target && ReferenceEquals(rows[row], target))
+					context.FillRectangle(DropRowFill, rowBounds);
 				else if (row == hoveredRow && dragRow < 0)
 					context.FillRectangle(HoverRowFill, rowBounds);
 
-				if (row < labels.Count - 1)
+				if (row < rows.Count - 1)
 					context.DrawLine(SeparatorPen, new Point(0, top + RowHeight - 0.5), new Point(bounds.Width, top + RowHeight - 0.5));
 
-				DrawName(context, labels[row], new Rect(TextPadding, top, Math.Max(0, bounds.Width - TextPadding * 2), RowHeight));
+				var indent = TextPadding + rows[row].Depth * IndentWidth;
+				DrawName(context, labels[row], new Rect(indent, top, Math.Max(0, bounds.Width - indent - TextPadding), RowHeight));
 			}
 
 			if (dragRow >= 0 && dragTarget >= 0)
 			{
 				//The line sits on the display boundary the dragged row would land on when released.
-				var y = ListTop + Math.Min(dragTarget, labels.Count) * RowHeight - scrollOffset;
-				y = Math.Clamp(y, ListTop, ListTop + Math.Min(labels.Count * RowHeight, viewportHeight));
+				var y = ListTop + Math.Min(dragTarget, rows.Count) * RowHeight - scrollOffset;
+				y = Math.Clamp(y, ListTop, ListTop + Math.Min(rows.Count * RowHeight, viewportHeight));
 				context.DrawLine(InsertionPen, new Point(0, y), new Point(bounds.Width, y));
 				context.FillRectangle(ThemeDefinition.Selection, new Rect(0, y - 1.5, 3, 3));
 				context.FillRectangle(ThemeDefinition.Selection, new Rect(bounds.Width - 3, y - 1.5, 3, 3));
@@ -218,13 +227,108 @@ public sealed class ElementHierarchyView : Control
 		context.DrawText(Ellipsis, new Point(row.X + row.Width - Ellipsis.Width, row.Y + (row.Height - Ellipsis.Height) / 2));
 	}
 
+	/// <summary>Draws the button at the right end of the header band, which adds a new empty group to the document.</summary>
+	private void DrawNewGroupButton(DrawingContext context, Size view)
+	{
+		var button = NewGroupButtonBounds(view);
+		context.FillRectangle(buttonHover ? SelectedRowFill : ThemeDefinition.Border, button);
+
+		//The plus sign marks the button as an "add" action.
+		var center = button.Center;
+		context.DrawLine(PlusPen, new Point(center.X - NewGroupPlusArm, center.Y), new Point(center.X + NewGroupPlusArm, center.Y));
+		context.DrawLine(PlusPen, new Point(center.X, center.Y - NewGroupPlusArm), new Point(center.X, center.Y + NewGroupPlusArm));
+	}
+
+	/// <summary>The bounds of the new group button in the header band, in view coordinates.</summary>
+	private static Rect NewGroupButtonBounds(Size view) =>
+		new(view.Width - NewGroupButtonWidth - TextPadding, GripHeight + (HeaderHeight - NewGroupButtonHeight) / 2, NewGroupButtonWidth, NewGroupButtonHeight);
+
+	/// <summary>Adds a new empty group on top of the hierarchy and selects it; elements can then be dragged onto its row to fill it.</summary>
+	private void CreateGroup()
+	{
+		if (canvas?.Document is not { } document)
+			return;
+
+		var group = new GroupElement();
+		document.AddTracked(group);
+		canvas.Selection.SelectedElement = group;
+		canvas.DrillGroup = null;
+		canvas.Focus();
+		canvas.InvalidateVisual();
+	}
+
+	/// <summary>Selects the pressed row like a left press would and opens its rename/delete menu at the pointer; returns false when the press hit no row.</summary>
+	private bool ShowRowMenu(Point position)
+	{
+		if (RowAt(position) is not { } row || canvas is not { } owner)
+			return false;
+
+		//The row is selected like a left press would, so the menu and the canvas agree on the element.
+		var element = rows[row].Element;
+		owner.Selection.SelectedElement = element;
+		owner.DrillGroup = element.Parent;
+		menuElement = element;
+
+		//Reopening a menu that is already open must close it first, or the new position is ignored; same workaround as the canvas menus.
+		if (rowMenu.IsOpen)
+		{
+			rowMenu.Close();
+			Dispatcher.UIThread.Post(() => rowMenu.Open(this));
+		}
+		else
+			rowMenu.Open(this);
+
+		return true;
+	}
+
+	/// <summary>Asks for a new name for the menu's element and records the rename in the undo history; an empty answer falls back to the element's kind.</summary>
+	private async Task RenameElementAsync()
+	{
+		if (menuElement is not { } element || canvas?.Document is not { } document)
+			return;
+
+		if (TopLevel.GetTopLevel(this) is not Window window)
+			return;
+
+		var name = await TextPromptDialog.ShowDialog(window, "Rename", "Name", element.DisplayName);
+		if (name is null)
+			return;
+
+		document.RenameTracked(element, string.IsNullOrWhiteSpace(name) ? null : name.Trim());
+	}
+
+	/// <summary>Removes the menu's element, with everything inside it, from the document; recorded in the undo history.</summary>
+	private void DeleteElement()
+	{
+		if (menuElement is not { } element || canvas?.Document is not { } document)
+			return;
+
+		document.RemoveTracked(element);
+	}
+
 	protected override void OnPointerPressed(PointerPressedEventArgs e)
 	{
 		base.OnPointerPressed(e);
 
 		var point = e.GetCurrentPoint(this);
+
+		if (point.Properties.IsRightButtonPressed)
+		{
+			if (ShowRowMenu(point.Position))
+				e.Handled = true;
+			return;
+		}
+
 		if (!point.Properties.IsLeftButtonPressed)
 			return;
+
+		if (NewGroupButtonBounds(Bounds.Size).Contains(point.Position))
+		{
+			CreateGroup();
+			e.Handled = true;
+			InvalidateVisual();
+			return;
+		}
 
 		if (point.Position.Y <= GripHeight)
 		{
@@ -238,14 +342,20 @@ public sealed class ElementHierarchyView : Control
 			return;
 		}
 
-		if (RowAt(point.Position) is not { } row || ElementAt(row) is not { } element || canvas is not { } owner)
+		if (RowAt(point.Position) is not { } row || canvas is not { } owner)
 			return;
 
 		//Pressing a row selects it right away, like pressing the element on the canvas does; the
-		//canvas also takes focus, so the delete and layering shortcuts keep working.
+		//canvas also takes focus, so the delete and layering shortcuts keep working. Selecting a
+		//group's member drills the canvas into that group, so a click there picks it directly.
+		//The element is read before the selection assignment, which refreshes this list and could shift the row index.
+		var element = rows[row].Element;
 		owner.Selection.SelectedElement = element;
+		owner.DrillGroup = element.Parent;
 		owner.Focus();
 		dragRow = row;
+		dragElement = element;
+		dropRow = null;
 		dragTarget = -1;
 		dragStart = point.Position;
 		e.Pointer.Capture(this);
@@ -270,16 +380,52 @@ public sealed class ElementHierarchyView : Control
 		if (dragRow >= 0)
 		{
 			//The drag starts only once the pressed row moved; until then the press stays a click.
-			if (dragTarget < 0 && Math.Abs(position.Y - dragStart.Y) < DragThreshold)
+			if (dropRow is null && dragTarget < 0 && Math.Abs(position.Y - dragStart.Y) < DragThreshold)
 				return;
 
-			dragTarget = (int)Math.Clamp(Math.Round((position.Y - ListTop + scrollOffset) / RowHeight), 0, labels.Count);
+			UpdateDrop(position);
 			e.Handled = true;
 			InvalidateVisual();
 			return;
 		}
 
 		UpdateHover(position);
+	}
+
+	/// <summary>Decides what the dragged element would land on at <paramref name="position"/>: a row's drop band or a boundary between rows.</summary>
+	private void UpdateDrop(Point position)
+	{
+		dropRow = null;
+		dragTarget = -1;
+
+		if (RowAt(position) is { } row && IsValidDropTarget(rows[row].Element))
+		{
+			//Only the band around a row's vertical center drops onto the row; the edges drop between rows instead.
+			var offsetInRow = position.Y - (ListTop + row * RowHeight - scrollOffset);
+			if (offsetInRow >= RowHeight * (1 - DropBand) / 2 && offsetInRow <= RowHeight * (1 + DropBand) / 2)
+			{
+				dropRow = rows[row];
+				return;
+			}
+		}
+
+		dragTarget = (int)Math.Clamp(Math.Round((position.Y - ListTop + scrollOffset) / RowHeight), 0, rows.Count);
+	}
+
+	/// <summary>Whether the dragged element may land on <paramref name="element"/>: not itself and not one of its own contents.</summary>
+	private bool IsValidDropTarget(CanvasElement element) =>
+		dragElement is not null && !ReferenceEquals(dragElement, element) && !IsDescendantOf(dragElement, element);
+
+	/// <summary>Whether <paramref name="element"/> lies inside <paramref name="ancestor"/> or any of its groups.</summary>
+	private static bool IsDescendantOf(CanvasElement element, CanvasElement ancestor)
+	{
+		for (var current = element; current is not null; current = current.Parent)
+		{
+			if (ReferenceEquals(current, ancestor))
+				return true;
+		}
+
+		return false;
 	}
 
 	protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -300,19 +446,86 @@ public sealed class ElementHierarchyView : Control
 		if (dragRow < 0)
 			return;
 
-		var element = ElementAt(dragRow);
+		var element = dragElement;
+		var target = dropRow;
 		var boundary = dragTarget;
 		dragRow = -1;
+		dragElement = null;
+		dropRow = null;
 		dragTarget = -1;
 		if (e.Pointer.Captured == this)
 			e.Pointer.Capture(null);
 
-		//The display boundary the row was dropped on becomes the element's new position in the rendering order.
-		if (element is not null && boundary >= 0 && canvas?.Document is { } document)
-			document.ReorderToTracked(element, labels.Count - 1 - Math.Min(boundary, labels.Count - 1));
+		if (element is not null && target is { } row)
+			DropOnRow(element, row.Element);
+		else if (element is not null && boundary >= 0)
+			DropAtBoundary(element, boundary);
 
 		e.Handled = true;
 		InvalidateVisual();
+	}
+
+	/// <summary>Drops <paramref name="element"/> onto <paramref name="target"/>: a group takes it in, a plain element is wrapped in a new group with it.</summary>
+	private void DropOnRow(CanvasElement element, CanvasElement target)
+	{
+		if (canvas?.Document is not { } document)
+			return;
+
+		if (target is GroupElement group)
+		{
+			if (element.Parent == group)
+				return;
+
+			document.ReparentTracked(element, group, group.Children.Count, "Group " + element.Kind);
+			return;
+		}
+
+		//Dropping onto a plain element wraps the two in a new group, which becomes the selection.
+		document.CreateGroupTracked(element, target);
+		canvas.Selection.SelectedElement = target.Parent;
+		canvas.DrillGroup = null;
+	}
+
+	/// <summary>
+	/// Drops <paramref name="element"/> on the display <paramref name="boundary"/>: at its own level it reorders,
+	/// at another level it moves into the group there, and at the root level it leaves its group, keeping its place on the canvas.
+	/// </summary>
+	private void DropAtBoundary(CanvasElement element, int boundary)
+	{
+		if (canvas?.Document is not { } document)
+			return;
+
+		//The container and index the boundary points at: the row below the boundary decides where in
+		//its container the element lands, and below the whole list is the bottom of the root level.
+		GroupElement? container;
+		int index;
+		if (boundary >= rows.Count)
+		{
+			container = null;
+			index = 0;
+		}
+		else
+		{
+			container = rows[boundary].Container;
+			index = rows[boundary].DrawIndex;
+		}
+
+		if (container is not null && !IsValidDropTarget(container))
+			return;
+
+		if (element.Parent == container)
+		{
+			var current = document.IndexOf(element);
+			//The target index counts the element still sitting in the container; moving up means one slot less.
+			if (current >= 0 && current < index)
+				index--;
+
+			document.ReorderToTracked(element, index);
+			return;
+		}
+
+		var description = container is null ? "Ungroup " + element.Kind : "Group " + element.Kind;
+		document.ReparentTracked(element, container, index, description);
 	}
 
 	protected override void OnPointerExited(PointerEventArgs e)
@@ -322,10 +535,11 @@ public sealed class ElementHierarchyView : Control
 		if (dragRow >= 0 || resizing)
 			return;
 
-		if (hoveredRow != -1 || gripHover)
+		if (hoveredRow != -1 || gripHover || buttonHover)
 		{
 			hoveredRow = -1;
 			gripHover = false;
+			buttonHover = false;
 			Cursor = Cursor.Default;
 			InvalidateVisual();
 		}
@@ -336,7 +550,7 @@ public sealed class ElementHierarchyView : Control
 		base.OnPointerWheelChanged(e);
 		e.Handled = true;
 
-		var max = Math.Max(0, labels.Count * RowHeight - Math.Max(0, Bounds.Height - ListTop));
+		var max = Math.Max(0, rows.Count * RowHeight - Math.Max(0, Bounds.Height - ListTop));
 		if (max <= 0)
 			return;
 
@@ -344,37 +558,30 @@ public sealed class ElementHierarchyView : Control
 		InvalidateVisual();
 	}
 
-	/// <summary>Updates the hovered row, the resize band hover and the cursor from the pointer position.</summary>
+	/// <summary>Updates the hovered row, the new group button, the resize band hover and the cursor from the pointer position.</summary>
 	private void UpdateHover(Point position)
 	{
-		var row = RowAt(position);
-		var overGrip = position.Y <= GripHeight;
-		if (row == hoveredRow && overGrip == gripHover)
+		//The button sits in the header band, above the list, so it outranks both the rows and the resize band.
+		var overButton = NewGroupButtonBounds(Bounds.Size).Contains(position);
+		var row = overButton ? null : RowAt(position);
+		var overGrip = !overButton && position.Y <= GripHeight;
+		if (row == hoveredRow && overGrip == gripHover && overButton == buttonHover)
 			return;
 
 		hoveredRow = row ?? -1;
 		gripHover = overGrip;
-		Cursor = overGrip ? ResizeCursor : row is not null ? HandCursor : Cursor.Default;
+		buttonHover = overButton;
+		Cursor = overGrip ? ResizeCursor : row is not null || overButton ? HandCursor : Cursor.Default;
 		InvalidateVisual();
 	}
 
 	/// <summary>The display row at the position, or null when it is outside the list.</summary>
 	private int? RowAt(Point position)
 	{
-		if (labels.Count == 0 || position.X < 0 || position.X > Bounds.Width)
+		if (rows.Count == 0 || position.X < 0 || position.X > Bounds.Width)
 			return null;
 
 		var row = (int)Math.Floor((position.Y - ListTop + scrollOffset) / RowHeight);
-		return row >= 0 && row < labels.Count ? row : null;
-	}
-
-	/// <summary>The element shown in the display row, or null when the row is outside the list.</summary>
-	private CanvasElement? ElementAt(int row)
-	{
-		var elements = canvas?.Document?.Elements;
-		if (elements is null || (uint)row >= (uint)elements.Count)
-			return null;
-
-		return elements[elements.Count - 1 - row];
+		return row >= 0 && row < rows.Count ? row : null;
 	}
 }

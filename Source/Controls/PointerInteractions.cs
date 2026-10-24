@@ -62,7 +62,7 @@ internal sealed class ElementMoveDrag : IPointerDrag
 	private readonly PreviewCanvas canvas;
 	private readonly CanvasElement element;
 	private readonly Point startPosition;
-	private readonly SKPoint elementStartPosition;
+	private readonly SKPoint startAnchor;
 	private readonly CanvasElement.ElementState startState;
 
 	public ElementMoveDrag(PreviewCanvas canvas, CanvasElement element, Point position)
@@ -70,7 +70,9 @@ internal sealed class ElementMoveDrag : IPointerDrag
 		this.canvas = canvas;
 		this.element = element;
 		startPosition = position;
-		elementStartPosition = element.Position;
+		//The anchor is the element's frame origin in document space; the drag delta is added there and
+		//converted into the parent's content space, so elements move correctly inside rotated and scaled groups.
+		startAnchor = element.ParentToDocument(element.Position);
 		startState = element.CaptureState();
 	}
 
@@ -83,9 +85,10 @@ internal sealed class ElementMoveDrag : IPointerDrag
 			return;
 
 		var scale = canvas.Viewport.Scale;
-		element.Position = new SKPoint(
-			elementStartPosition.X + (float)((position.X - startPosition.X) / scale),
-			elementStartPosition.Y + (float)((position.Y - startPosition.Y) / scale));
+		var delta = new SKPoint(
+			(float)((position.X - startPosition.X) / scale),
+			(float)((position.Y - startPosition.Y) / scale));
+		element.Position = element.DocumentToParent(startAnchor + delta);
 		document.RaiseChanged();
 	}
 
@@ -100,7 +103,7 @@ internal sealed class ElementScaleDrag : IPointerDrag
 	private readonly PreviewCanvas canvas;
 	private readonly Corner corner;
 	private readonly SKPoint anchor;
-	private readonly SKPoint anchorWorld;
+	private readonly SKPoint anchorParent;
 	private readonly CanvasElement.ScaleState start;
 	private readonly CanvasElement.ElementState startState;
 
@@ -109,8 +112,8 @@ internal sealed class ElementScaleDrag : IPointerDrag
 		this.canvas = canvas;
 		this.corner = corner;
 		var element = canvas.Selection.SelectedElement!;
-		anchor = SelectionLayer.GetAnchor(element.Bounds, corner);
-		anchorWorld = element.ToDocument(anchor);
+		anchor = SelectionLayer.GetAnchor(element.ContentBounds, corner);
+		anchorParent = element.ToParentSpace(anchor);
 		start = element.BeginScale();
 		startState = element.CaptureState();
 	}
@@ -124,15 +127,25 @@ internal sealed class ElementScaleDrag : IPointerDrag
 		if (element is null || document is null)
 			return;
 
-		//Scaling happens in the element's unrotated frame: the cursor is rotated into
-		//local space, and afterwards the element is shifted so the anchor corner stays
-		//pinned at the same document-space point regardless of rotation.
 		var documentCursor = canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document));
-		element.ScaleTo(element.ToLocal(documentCursor), anchor, start, e);
 
-		var shifted = element.ToDocument(anchor);
-		if (shifted != anchorWorld)
-			element.Position += anchorWorld - shifted;
+		//Scaling happens in the element's unrotated frame: the cursor is rotated into local space,
+		//and afterwards the element is shifted so the anchor corner stays pinned at the same point
+		//in the parent's space regardless of rotation. Groups take the parent-space cursor instead,
+		//because their own scale would feed back into the content-space cursor; they always keep
+		//their aspect ratio, so no modifier switches it.
+		if (element is GroupElement group)
+		{
+			var cursorParent = element.DocumentToParent(documentCursor);
+			group.ScaleToParent(cursorParent, corner, (GroupElement.GroupScaleState)start);
+		}
+		else
+		{
+			element.ScaleTo(element.ToLocal(documentCursor), anchor, start, e);
+			var shifted = element.ToParentSpace(anchor);
+			if (shifted != anchorParent)
+				element.Position += anchorParent - shifted;
+		}
 
 		document.RaiseChanged();
 	}
@@ -149,7 +162,7 @@ internal sealed class ElementCropDrag : IPointerDrag
 	private readonly PreviewCanvas canvas;
 	private readonly Edge edge;
 	private readonly SKPoint anchor;
-	private readonly SKPoint anchorWorld;
+	private readonly SKPoint anchorParent;
 	private readonly ImageElement.ImageCropState start;
 	private readonly CanvasElement.ElementState startState;
 
@@ -158,8 +171,8 @@ internal sealed class ElementCropDrag : IPointerDrag
 		this.canvas = canvas;
 		this.edge = edge;
 		var element = (ImageElement)canvas.Selection.SelectedElement!;
-		anchor = SelectionLayer.GetCropAnchor(element.Bounds, edge);
-		anchorWorld = element.ToDocument(anchor);
+		anchor = SelectionLayer.GetCropAnchor(element.ContentBounds, edge);
+		anchorParent = element.ToParentSpace(anchor);
 		start = element.BeginCrop();
 		startState = element.CaptureState();
 	}
@@ -174,13 +187,13 @@ internal sealed class ElementCropDrag : IPointerDrag
 			return;
 
 		//Like scaling, cropping happens in the element's unrotated frame, and the fixed
-		//opposite edge is pinned at the same document-space point regardless of rotation.
+		//opposite edge is pinned at the same point in the parent's space regardless of rotation.
 		var documentCursor = canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document));
 		element.CropTo(element.ToLocal(documentCursor), edge, start);
 
-		var shifted = element.ToDocument(anchor);
-		if (shifted != anchorWorld)
-			element.Position += anchorWorld - shifted;
+		var shifted = element.ToParentSpace(anchor);
+		if (shifted != anchorParent)
+			element.Position += anchorParent - shifted;
 
 		document.RaiseChanged();
 	}
@@ -196,7 +209,7 @@ internal sealed class ElementRotateDrag : IPointerDrag
 {
 	private readonly PreviewCanvas canvas;
 	private readonly CanvasElement element;
-	private readonly SKPoint center;
+	private readonly SKPoint pivot;
 	private readonly float startRotation;
 	private readonly CanvasElement.ElementState startState;
 	private float lastAngle;
@@ -205,7 +218,7 @@ internal sealed class ElementRotateDrag : IPointerDrag
 	{
 		this.canvas = canvas;
 		element = canvas.Selection.SelectedElement!;
-		center = element.Center;
+		pivot = element.DocumentPivot;
 		startRotation = element.Rotation;
 		lastAngle = AngleTo(position);
 		startState = element.CaptureState();
@@ -238,12 +251,12 @@ internal sealed class ElementRotateDrag : IPointerDrag
 		canvas.Document?.RecordStateChange(element, startState, "Rotate " + element.Kind);
 	}
 
-	/// <summary>The angle from the element's center to <paramref name="position"/>, in degrees.</summary>
+	/// <summary>The angle from the element's rotation pivot to <paramref name="position"/>, in degrees.</summary>
 	private float AngleTo(Point position)
 	{
 		var document = canvas.Document!;
 		var point = canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document));
-		return (float)(Math.Atan2(point.Y - center.Y, point.X - center.X) * 180 / Math.PI);
+		return (float)(Math.Atan2(point.Y - pivot.Y, point.X - pivot.X) * 180 / Math.PI);
 	}
 }
 

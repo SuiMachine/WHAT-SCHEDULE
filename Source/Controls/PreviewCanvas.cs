@@ -104,37 +104,38 @@ public class PreviewCanvas : Control, IDisposable
 			return;
 		}
 
-		if (!e.KeyModifiers.HasFlag(KeyModifiers.Control))
-			return;
-
-		if (e.Key == Key.C)
+		//CTRL+ interactions
+		if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
 		{
-			CopySelection();
-			e.Handled = true;
-		}
-		else if (e.Key == Key.X)
-		{
-			CutSelection();
-			e.Handled = true;
-		}
-		else if (e.Key == Key.V)
-		{
-			PasteClipboard();
-			e.Handled = true;
-		}
-		else if (e.Key == Key.Z)
-		{
-			//Ctrl+Shift+Z redoes, like Ctrl+Y does.
-			if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+			if (e.Key == Key.C)
+			{
+				CopySelection();
+				e.Handled = true;
+			}
+			else if (e.Key == Key.X)
+			{
+				CutSelection();
+				e.Handled = true;
+			}
+			else if (e.Key == Key.V)
+			{
+				PasteClipboard();
+				e.Handled = true;
+			}
+			else if (e.Key == Key.Z)
+			{
+				//Ctrl+Shift+Z redoes, like Ctrl+Y does.
+				if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+					document.History.Redo(document);
+				else
+					document.History.Undo(document);
+				e.Handled = true;
+			}
+			else if (e.Key == Key.Y)
+			{
 				document.History.Redo(document);
-			else
-				document.History.Undo(document);
-			e.Handled = true;
-		}
-		else if (e.Key == Key.Y)
-		{
-			document.History.Redo(document);
-			e.Handled = true;
+				e.Handled = true;
+			}
 		}
 	}
 

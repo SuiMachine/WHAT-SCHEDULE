@@ -2,12 +2,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using System.Globalization;
 using WhatSchedule.Controls.Dialogs;
 using WhatSchedule.Documents;
 using WhatSchedule.Elements;
+using static WhatSchedule.ThemeDefinition.HierarchyView;
 
 namespace WhatSchedule.Controls;
 
@@ -21,79 +21,6 @@ namespace WhatSchedule.Controls;
 /// </summary>
 public sealed class ElementHierarchyView : Control
 {
-	/// <summary>The height of the resize band at the top edge, in pixels.</summary>
-	private const double GripHeight = 6;
-
-	/// <summary>The height of the header band between the resize band and the list, in pixels.</summary>
-	private const double HeaderHeight = 20;
-
-	/// <summary>The distance of the first row from the top edge, in pixels.</summary>
-	private const double ListTop = GripHeight + HeaderHeight;
-
-	/// <summary>The height of one element row, in pixels.</summary>
-	private const double RowHeight = 20;
-
-	/// <summary>The font size of the header and the element names.</summary>
-	private const double FontSize = 12;
-
-	/// <summary>The horizontal padding of the drawn texts, in pixels.</summary>
-	private const double TextPadding = 8;
-
-	/// <summary>The indent of one hierarchy level, in pixels.</summary>
-	private const double IndentWidth = 12;
-
-	/// <summary>How far the pointer must move before a pressed row turns into a drag, in pixels.</summary>
-	private const double DragThreshold = 3;
-
-	/// <summary>The part of a row around its vertical center that drops the dragged element onto the row instead of between rows.</summary>
-	private const double DropBand = 0.5;
-
-	/// <summary>The width of the new group button in the header band, in pixels.</summary>
-	private const double NewGroupButtonWidth = 16;
-
-	/// <summary>The height of the new group button in the header band, in pixels.</summary>
-	private const double NewGroupButtonHeight = 14;
-
-	/// <summary>The length of the arms of the new group button's plus sign, in pixels.</summary>
-	private const double NewGroupPlusArm = 3;
-
-	/// <summary>The smallest height the top edge can shrink the view to, in pixels.</summary>
-	private const double MinViewHeight = 80;
-
-	/// <summary>The height left to the inspector above when the view is grown the largest, in pixels.</summary>
-	private const double MinSiblingHeight = 120;
-
-	/// <summary>The highlight of the row of the element selected on the canvas.</summary>
-	private static readonly ISolidColorBrush SelectedRowFill = new ImmutableSolidColorBrush(ThemeDefinition.Selection.Color, 0.2);
-
-	/// <summary>The highlight of the row under the pointer.</summary>
-	private static readonly ISolidColorBrush HoverRowFill = new ImmutableSolidColorBrush(Colors.White, 0.13);
-
-	/// <summary>The highlight of the row a dragged element would be dropped onto.</summary>
-	private static readonly ISolidColorBrush DropRowFill = new ImmutableSolidColorBrush(ThemeDefinition.Selection.Color, 0.35);
-
-	/// <summary>The pen of the lines separating the bands and the rows.</summary>
-	private static readonly IPen SeparatorPen = new Pen(ThemeDefinition.Border, 1);
-
-	/// <summary>The pen of the insertion line shown while a row is dragged.</summary>
-	private static readonly IPen InsertionPen = new Pen(ThemeDefinition.Selection, 1);
-
-	/// <summary>The pen of the plus sign of the new group button in the header band.</summary>
-	private static readonly IPen PlusPen = new Pen(ThemeDefinition.RulerLabel, 1);
-
-	private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
-	private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeNorthSouth);
-
-	private static readonly FormattedText HeaderLabel = new("Elements", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeDefinition.LabelTypeface, FontSize, ThemeDefinition.RulerLabel);
-
-	/// <summary>The hint shown while the document has no elements, e.g. before a schedule is loaded.</summary>
-	private static readonly FormattedText EmptyHint = new("No elements.", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeDefinition.LabelTypeface, FontSize, ThemeDefinition.RulerTick);
-
-	private static readonly FormattedText Ellipsis = new("…", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeDefinition.LabelTypeface, FontSize, ThemeDefinition.RulerLabel);
-
-	/// <summary>The typeface group rows are drawn with, so containers stand out from their contents.</summary>
-	private static readonly Typeface GroupTypeface = new(ThemeDefinition.LabelTypeface.FontFamily, FontStyle.Normal, FontWeight.Bold);
-
 	/// <summary>One display row of the tree: the element, its nesting depth, its container and its position in the container's rendering order.</summary>
 	private sealed record HierarchyRow(CanvasElement Element, int Depth, GroupElement? Container, int DrawIndex);
 

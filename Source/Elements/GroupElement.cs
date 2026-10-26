@@ -185,6 +185,7 @@ public sealed class GroupElement : CanvasElement
 	{
 		var clone = new GroupElement();
 		clone.RestoreState(CaptureState());
+		clone.Tag = Tag;
 		foreach (var child in children)
 			clone.InsertChild(child.Clone(), clone.children.Count);
 

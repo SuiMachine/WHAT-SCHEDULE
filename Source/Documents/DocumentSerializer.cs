@@ -63,82 +63,91 @@ namespace WhatSchedule.Documents
 			return document;
 		}
 
-		private static CanvasElement.ElementData ToData(CanvasElement element) => element switch
+		private static CanvasElement.ElementData ToData(CanvasElement element)
 		{
-			GroupElement group => new GroupElement.GroupElementData
+			CanvasElement.ElementData data = element switch
 			{
-				Name = element.Name,
-				Position = ToData(group.Position),
-				Rotation = group.Rotation,
-				ScaleX = group.ScaleX,
-				ScaleY = group.ScaleY,
-				Children = group.Children.Select(ToData).ToList()
-			},
-			LabelElement label => new LabelElement.LabelElementData
-			{
-				Name = element.Name,
-				Position = ToData(label.Position),
-				Rotation = label.Rotation,
-				Text = label.Text,
-				FontFamily = label.FontFamily,
-				FontWeight = label.FontStyle.Weight,
-				FontSlant = (int)label.FontStyle.Slant,
-				FontSize = label.FontSize,
-				LetterSpacing = label.LetterSpacing,
-				Stretch = label.Stretch,
-				Skew = label.Skew,
-				LineHeight = label.LineHeight,
-				Alignment = label.Alignment.ToString(),
-				VerticalPlacement = label.VerticalPlacement.ToString(),
-				Width = label.Width,
-				Height = label.Height,
-				Transform = label.Transform.ToString(),
-				TextColor = ToData(label.TextColor),
-				Opacity = label.Opacity,
-				GradientFill = label.GradientFill,
-				GradientColor = ToData(label.GradientColor),
-				GradientAngle = label.GradientAngle,
-				OutlineColor = ToData(label.OutlineColor),
-				OutlineWidth = label.OutlineWidth,
-				OutlinePosition = label.OutlinePosition.ToString(),
-				SecondOutlineColor = ToData(label.SecondOutlineColor),
-				SecondOutlineWidth = label.SecondOutlineWidth,
-				ShadowColor = ToData(label.ShadowColor),
-				ShadowBlur = label.ShadowBlur,
-				ShadowOffset = ToData(label.ShadowOffset),
-				ShadowBlendMode = label.ShadowBlendMode.ToString(),
-				GlowColor = ToData(label.GlowColor),
-				GlowBlur = label.GlowBlur,
-				Blur = label.Blur,
-				BlendMode = label.BlendMode.ToString(),
-				FlipX = label.FlipX,
-				FlipY = label.FlipY
-			},
-			ImageElement image => new ImageElement.ImageElementData
-			{
-				Name = element.Name,
-				Position = ToData(image.Position),
-				Rotation = image.Rotation,
-				Png = EncodePng(image.Bitmap),
-				Width = image.Width,
-				Height = image.Height,
-				CropLeft = image.Crop.Left,
-				CropTop = image.Crop.Top,
-				CropRight = image.Bitmap.Width - image.Crop.Right,
-				CropBottom = image.Bitmap.Height - image.Crop.Bottom,
-				Opacity = image.Opacity,
-				CornerRadius = image.CornerRadius,
-				FlipX = image.FlipX,
-				FlipY = image.FlipY,
-				ShadowColor = ToData(image.ShadowColor),
-				ShadowBlur = image.ShadowBlur,
-				ShadowOffset = ToData(image.ShadowOffset),
-				TintColor = ToData(image.TintColor),
-				TintMode = image.TintMode.ToString(),
-				BlendMode = image.BlendMode.ToString()
-			},
-			_ => throw new NotSupportedException($"Cannot save {element.GetType().Name} elements.")
-		};
+				GroupElement group => new GroupElement.GroupElementData
+				{
+					Name = element.Name,
+					Position = ToData(group.Position),
+					Rotation = group.Rotation,
+					ScaleX = group.ScaleX,
+					ScaleY = group.ScaleY,
+					Children = group.Children.Select(ToData).ToList()
+				},
+				LabelElement label => new LabelElement.LabelElementData
+				{
+					Name = element.Name,
+					Position = ToData(label.Position),
+					Rotation = label.Rotation,
+					Text = label.Text,
+					FontFamily = label.FontFamily,
+					FontWeight = label.FontStyle.Weight,
+					FontSlant = (int)label.FontStyle.Slant,
+					FontSize = label.FontSize,
+					LetterSpacing = label.LetterSpacing,
+					Stretch = label.Stretch,
+					Skew = label.Skew,
+					LineHeight = label.LineHeight,
+					Alignment = label.Alignment.ToString(),
+					VerticalPlacement = label.VerticalPlacement.ToString(),
+					Width = label.Width,
+					Height = label.Height,
+					Transform = label.Transform.ToString(),
+					TextColor = ToData(label.TextColor),
+					Opacity = label.Opacity,
+					GradientFill = label.GradientFill,
+					GradientColor = ToData(label.GradientColor),
+					GradientAngle = label.GradientAngle,
+					OutlineColor = ToData(label.OutlineColor),
+					OutlineWidth = label.OutlineWidth,
+					OutlinePosition = label.OutlinePosition.ToString(),
+					SecondOutlineColor = ToData(label.SecondOutlineColor),
+					SecondOutlineWidth = label.SecondOutlineWidth,
+					ShadowColor = ToData(label.ShadowColor),
+					ShadowBlur = label.ShadowBlur,
+					ShadowOffset = ToData(label.ShadowOffset),
+					ShadowBlendMode = label.ShadowBlendMode.ToString(),
+					GlowColor = ToData(label.GlowColor),
+					GlowBlur = label.GlowBlur,
+					Blur = label.Blur,
+					BlendMode = label.BlendMode.ToString(),
+					FlipX = label.FlipX,
+					FlipY = label.FlipY
+				},
+				ImageElement image => new ImageElement.ImageElementData
+				{
+					Name = element.Name,
+					Position = ToData(image.Position),
+					Rotation = image.Rotation,
+					Png = EncodePng(image.Bitmap),
+					Width = image.Width,
+					Height = image.Height,
+					CropLeft = image.Crop.Left,
+					CropTop = image.Crop.Top,
+					CropRight = image.Bitmap.Width - image.Crop.Right,
+					CropBottom = image.Bitmap.Height - image.Crop.Bottom,
+					Opacity = image.Opacity,
+					CornerRadius = image.CornerRadius,
+					FlipX = image.FlipX,
+					FlipY = image.FlipY,
+					ShadowColor = ToData(image.ShadowColor),
+					ShadowBlur = image.ShadowBlur,
+					ShadowOffset = ToData(image.ShadowOffset),
+					TintColor = ToData(image.TintColor),
+					TintMode = image.TintMode.ToString(),
+					BlendMode = image.BlendMode.ToString()
+				},
+				_ => throw new NotSupportedException($"Cannot save {element.GetType().Name} elements.")
+			};
+
+			//The tag is only written when the element carries one, so files saved before tags existed load and save unchanged.
+			if (element.Tag is { } tag)
+				data.Tags = [tag.SaveName];
+
+			return data;
+		}
 
 		private static CanvasElement FromData(CanvasElement.ElementData data)
 		{
@@ -233,6 +242,21 @@ namespace WhatSchedule.Documents
 
 			element.Rotation = data.Rotation;
 			element.Name = data.Name;
+
+			//Files saved by older versions could carry several tags; the first valid one becomes the element's single tag.
+			//Unknown tag names (saved by a newer version) are skipped instead of failing the whole document.
+			if (data.Tags is { } saved)
+			{
+				foreach (var name in saved)
+				{
+					if (ScheduleTag.TryParse(name) is { } tag)
+					{
+						element.Tag = tag;
+						break;
+					}
+				}
+			}
+
 			return element;
 		}
 

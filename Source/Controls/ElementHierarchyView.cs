@@ -17,7 +17,7 @@ namespace WhatSchedule.Controls;
 /// row selects the element on the canvas, and dragging a row either reorders it (dropped between rows),
 /// moves it into or out of a group (dropped between rows at another level), or drops it onto a row:
 /// onto a group it joins that group, onto a plain element the two are wrapped in a new group. Right-clicking
-/// a row opens a menu that renames or deletes its element. Every change is recorded in the document's undo history.
+/// a row opens a menu that tags, renames or deletes its element. Every change is recorded in the document's undo history.
 /// </summary>
 public sealed class ElementHierarchyView : Control
 {
@@ -28,8 +28,14 @@ public sealed class ElementHierarchyView : Control
 	private readonly List<HierarchyRow> rows = new();
 	private readonly List<FormattedText> labels = new();
 
-	/// <summary>The rename and delete menu opened by right-clicking a row; it acts on the element it was opened for.</summary>
+	/// <summary>The tag, rename and delete menu opened by right-clicking a row; it acts on the element it was opened for.</summary>
 	private readonly ContextMenu rowMenu;
+
+	/// <summary>The tag check items of the row menu, kept so the menu can be re-checked for the element it is opened on.</summary>
+	private readonly List<KeyValuePair<MenuItem, ScheduleTag>> tagItems = new();
+
+	/// <summary>The day items of the tag menu, kept so their headers can announce the element's tag.</summary>
+	private readonly List<KeyValuePair<MenuItem, ScheduleDay>> dayItems = new();
 
 	/// <summary>The element the row menu was opened for, kept because the menu outlives the rows it was built from.</summary>
 	private CanvasElement? menuElement;
@@ -72,6 +78,24 @@ public sealed class ElementHierarchyView : Control
 
 	public ElementHierarchyView()
 	{
+		//The tag menu nests the fourteen tags under their days, so picking a tag reads as "on this day, this happens".
+		var tagsItem = new MenuItem { Header = "Tags" };
+		foreach (var day in Enum.GetValues<ScheduleDay>())
+		{
+			var dayItem = new MenuItem { Header = day.ToString() };
+			dayItems.Add(new(dayItem, day));
+			foreach (var activity in Enum.GetValues<ScheduleActivity>())
+			{
+				var tag = new ScheduleTag(day, activity);
+				var activityItem = new MenuItem { Header = ScheduleTag.ActivityName(activity), ToggleType = MenuItemToggleType.CheckBox };
+				activityItem.Click += (_, _) => ToggleTag(tag);
+				tagItems.Add(new(activityItem, tag));
+				dayItem.Items.Add(activityItem);
+			}
+
+			tagsItem.Items.Add(dayItem);
+		}
+
 		var renameItem = new MenuItem { Header = "Rename..." };
 		renameItem.Click += async (_, _) => await RenameElementAsync();
 
@@ -79,6 +103,8 @@ public sealed class ElementHierarchyView : Control
 		deleteItem.Click += (_, _) => DeleteElement();
 
 		rowMenu = new ContextMenu();
+		rowMenu.Items.Add(tagsItem);
+		rowMenu.Items.Add(new Separator());
 		rowMenu.Items.Add(renameItem);
 		rowMenu.Items.Add(deleteItem);
 
@@ -269,6 +295,14 @@ public sealed class ElementHierarchyView : Control
 		owner.DrillGroup = element.Parent;
 		menuElement = element;
 
+		//The tag items are re-checked every time, because the menu outlives the elements it was opened for.
+		foreach (var pair in tagItems)
+			pair.Key.IsChecked = element.Tag == pair.Value;
+
+		//A day the element is tagged with shows the full tag in its header, so the choice is visible without opening the day.
+		foreach (var pair in dayItems)
+			pair.Key.Header = element.Tag is { } tag && tag.Day == pair.Value ? tag.DisplayName : pair.Value.ToString();
+
 		//Reopening a menu that is already open must close it first, or the new position is ignored; same workaround as the canvas menus.
 		if (rowMenu.IsOpen)
 		{
@@ -279,6 +313,13 @@ public sealed class ElementHierarchyView : Control
 			rowMenu.Open(this);
 
 		return true;
+	}
+
+	/// <summary>Toggles <paramref name="tag"/> on the menu's element, recorded in the undo history; the element carries at most one tag, so any other replaces it.</summary>
+	private void ToggleTag(ScheduleTag tag)
+	{
+		if (menuElement is { } element && canvas?.Document is { } document)
+			document.ToggleTagTracked(element, tag);
 	}
 
 	/// <summary>Asks for a new name for the menu's element and records the rename in the undo history; an empty answer falls back to the element's kind.</summary>

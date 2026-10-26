@@ -194,6 +194,24 @@ namespace WhatSchedule.Documents
 		}
 	}
 
+	/// <summary>Schedule tag assigned to or removed from an element, e.g. a label tagged "Monday: Streaming".</summary>
+	internal sealed class ElementTagAction(CanvasElement element, ScheduleTag? before, ScheduleTag? after) : IHistoryAction
+	{
+		public string Description => "Tag " + element.Kind;
+
+		public void Undo(Document document)
+		{
+			element.Tag = before;
+			document.RaiseChanged();
+		}
+
+		public void Redo(Document document)
+		{
+			element.Tag = after;
+			document.RaiseChanged();
+		}
+	}
+
 	/// <summary>An element whose state changed (e.g. by moving or scaling it).</summary>
 	internal sealed class ElementStateAction(CanvasElement element, CanvasElement.ElementState before, CanvasElement.ElementState after, string description) : IHistoryAction
 	{

@@ -262,6 +262,7 @@ namespace WhatSchedule.Elements
 		{
 			var clone = new ImageElement(Bitmap, SKPoint.Empty);
 			clone.RestoreState(CaptureState());
+			clone.Tag = Tag;
 			return clone;
 		}
 

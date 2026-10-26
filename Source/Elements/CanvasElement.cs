@@ -28,6 +28,9 @@ public abstract class CanvasElement
 	/// <summary>The user-given name shown in the hierarchy list, or null to fall back to <see cref="Kind"/>.</summary>
 	public string? Name { get; set; }
 
+	/// <summary>The single schedule tag assigned to this element, or null when it has none; toggling is enforced by <see cref="WhatSchedule.Documents.Document.ToggleTagTracked"/>.</summary>
+	public ScheduleTag? Tag { get; set; }
+
 	/// <summary>The element's name as shown in the hierarchy list; the user-given name, the kind by default.</summary>
 	public virtual string DisplayName => Name ?? Kind;
 
@@ -224,6 +227,9 @@ public abstract class CanvasElement
 
 		/// <summary>The user-given hierarchy name, or null when the element shows its kind.</summary>
 		public string? Name { get; set; }
+
+		/// <summary>The element's schedule tag in its serialized form, e.g. "Monday:Streaming"; null when it has none. Stays a list so files saved by older versions load unchanged.</summary>
+		public List<string>? Tags { get; set; }
 
 		/// <summary>The element's local position in its parent's content space.</summary>
 		public PointData Position { get; set; } = new();

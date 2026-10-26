@@ -176,6 +176,22 @@ public sealed class Document
 		RaiseChanged();
 	}
 
+	/// <summary>
+	/// Toggles <paramref name="tag"/> on <paramref name="element"/> and records the change in the undo history:
+	/// a tag the element already carries is removed, any other tag replaces the element's single tag.
+	/// </summary>
+	public void ToggleTagTracked(CanvasElement element, ScheduleTag tag)
+	{
+		ScheduleTag? after = element.Tag == tag ? null : tag;
+		if (element.Tag == after)
+			return;
+
+		var before = element.Tag;
+		element.Tag = after;
+		History.Push(new ElementTagAction(element, before, after));
+		RaiseChanged();
+	}
+
 	/// <summary>Records an element state change in the undo history, skipping it when the state did not actually change.</summary>
 	public void RecordStateChange(CanvasElement element, CanvasElement.ElementState before, string description)
 	{

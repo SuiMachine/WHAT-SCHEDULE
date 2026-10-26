@@ -290,6 +290,7 @@ public sealed class LabelElement : CanvasElement
 	{
 		var clone = new LabelElement();
 		clone.RestoreState(CaptureState());
+		clone.Tag = Tag;
 		return clone;
 	}
 

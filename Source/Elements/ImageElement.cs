@@ -200,7 +200,7 @@ namespace WhatSchedule.Elements
 			}
 		}
 
-		public override void Draw(SKCanvas canvas)
+		public override void Draw(SKCanvas canvas, ScheduleActivity? filter)
 		{
 			var bounds = Bounds;
 			var count = canvas.Save();

@@ -3,6 +3,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using SkiaSharp;
 using WhatSchedule.Documents;
+using WhatSchedule.Elements;
 using WhatSchedule.Rendering;
 
 namespace WhatSchedule.Controls;
@@ -37,8 +38,8 @@ internal sealed class PreviewSurface : IDisposable
 		return true;
 	}
 
-	/// <summary>Re-renders the document into the bitmap if anything changed since the last render.</summary>
-	public void Render(Document document)
+	/// <summary>Re-renders the document into the bitmap if anything changed since the last render. The activity filter hides elements whose tag names another activity.</summary>
+	public void Render(Document document, ScheduleActivity? filter)
 	{
 		if (!dirty || bitmap is null)
 			return;
@@ -46,7 +47,7 @@ internal sealed class PreviewSurface : IDisposable
 		using var framebuffer = bitmap.Lock();
 		var info = new SKImageInfo(document.Width, document.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
 		using var surface = SKSurface.Create(info, framebuffer.Address, framebuffer.RowBytes);
-		DocumentRenderer.Render(document, surface.Canvas);
+		DocumentRenderer.Render(document, surface.Canvas, filter);
 		dirty = false;
 	}
 

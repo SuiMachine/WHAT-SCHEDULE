@@ -39,6 +39,28 @@ public class PreviewCanvas : Control, IDisposable
 
 	internal Rect GetImageRect(Document document) => Viewport.GetImageRect(ContentRect, new Size(document.Width, document.Height));
 
+	private ScheduleActivity? tagFilter;
+
+	/// <summary>
+	/// The activity filter of the canvas display: null shows everything, an activity only the elements tagged with it
+	/// (and the groups holding one). Display-only: exports render the whole document.
+	/// </summary>
+	public ScheduleActivity? TagFilter
+	{
+		get => tagFilter;
+		set
+		{
+			if (tagFilter == value)
+				return;
+
+			tagFilter = value;
+			if (Selection.SelectedElement is { } selected && !selected.PassesFilter(value))
+				Selection.SelectedElement = null;
+			Surface.MarkDirty();
+			InvalidateVisual();
+		}
+	}
+
 	private IPointerDrag? activeDrag;
 
 	/// <summary>The element copied by Ctrl+C or cut, waiting to be pasted.</summary>
@@ -434,21 +456,22 @@ public class PreviewCanvas : Control, IDisposable
 		var point = Viewport.ScreenToDocument(position, GetImageRect(document));
 		for (var i = document.RootElements.Count - 1; i >= 0; i--)
 		{
-			if (HitTest(document.RootElements[i], point) is { } element)
+			if (document.RootElements[i].PassesFilter(tagFilter) && HitTest(document.RootElements[i], point, tagFilter) is { } element)
 				return element;
 		}
 
 		return null;
 	}
 
-	/// <summary>The topmost element at <paramref name="point"/> (in document pixels): a group's children are hit first, and the empty space inside a group's frame picks the group itself.</summary>
-	private static CanvasElement? HitTest(CanvasElement element, SKPoint point)
+	/// <summary>The topmost element at <paramref name="point"/> (in document pixels) passing the activity <paramref name="filter"/>: a group's children are hit first, and the empty space inside a group's frame picks the group itself.</summary>
+	private static CanvasElement? HitTest(CanvasElement element, SKPoint point, ScheduleActivity? filter)
 	{
 		if (element is GroupElement group)
 		{
+			var childFilter = element.ChildFilter(filter);
 			for (var i = group.Children.Count - 1; i >= 0; i--)
 			{
-				if (HitTest(group.Children[i], point) is { } child)
+				if (group.Children[i].PassesFilter(childFilter) && HitTest(group.Children[i], point, childFilter) is { } child)
 					return child;
 			}
 
@@ -485,7 +508,7 @@ public class PreviewCanvas : Control, IDisposable
 			Viewport.ResetFit();
 
 		Viewport.TryInitialFit(ContentRect, new Size(document.Width, document.Height));
-		Surface.Render(document);
+		Surface.Render(document, tagFilter);
 
 		var imageRect = GetImageRect(document);
 		context.DrawImage(Surface.Bitmap!, imageRect);

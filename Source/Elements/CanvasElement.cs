@@ -176,8 +176,20 @@ public abstract class CanvasElement
 		return ContentBounds.Contains(local.X, local.Y);
 	}
 
-	/// <summary>Draws the element onto the document; the canvas state is the element's parent content space.</summary>
-	public abstract void Draw(SKCanvas canvas);
+	/// <summary>Draws the element onto the document; the canvas state is the element's parent content space. The activity <paramref name="filter"/> hides the element (see <see cref="PassesFilter"/>).</summary>
+	public abstract void Draw(SKCanvas canvas, ScheduleActivity? filter);
+
+	/// <summary>Whether the element is displayed under the activity <paramref name="filter"/>: always when unfiltered, otherwise when its own tag matches, else when it is a group holding a displayed descendant.</summary>
+	internal bool PassesFilter(ScheduleActivity? filter)
+	{
+		if (filter is null || Tag?.Activity == filter)
+			return true;
+
+		return this is GroupElement group && group.Children.Any(child => child.PassesFilter(filter));
+	}
+
+	/// <summary>The filter the element's children render under: none when the element's own tag matches the filter, since then its whole content shows.</summary>
+	internal ScheduleActivity? ChildFilter(ScheduleActivity? filter) => filter is not null && Tag?.Activity == filter ? null : filter;
 
 	/// <summary>
 	/// State of an element captured when a scale drag starts, so every drag step can be

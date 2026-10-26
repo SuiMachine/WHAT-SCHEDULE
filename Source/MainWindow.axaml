@@ -121,7 +121,20 @@
 				</StackPanel>
 			</Grid>
 		</Border>
-		<NativeMenuBar DockPanel.Dock="Top" />
+		<!--The activity filter sits at the end of the menu bar, because a native menu cannot hold controls.-->
+		<DockPanel DockPanel.Dock="Top">
+			<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+				<TextBlock Text="Activity filter:" Margin="12,0,6,0" VerticalAlignment="Center" FontSize="12"
+						   Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+				<ComboBox x:Name="TagFilter" Margin="0,2,12,2" VerticalAlignment="Center"
+						  SelectedIndex="0" SelectionChanged="OnTagFilterChanged">
+					<ComboBoxItem Content="None" />
+					<ComboBoxItem Content="Streaming" />
+					<ComboBoxItem Content="Taking a break" />
+				</ComboBox>
+			</StackPanel>
+			<NativeMenuBar />
+		</DockPanel>
 		<Grid Margin="4" Background="{x:Static app:ThemeDefinition.Background}">
 			<Grid>
 				<Grid.ColumnDefinitions>

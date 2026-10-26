@@ -81,15 +81,17 @@ public sealed class GroupElement : CanvasElement
 		return new SKPoint(ScaleX != 0 ? rotated.X / ScaleX : rotated.X, ScaleY != 0 ? rotated.Y / ScaleY : rotated.Y);
 	}
 
-	/// <summary>Draws the children inside the group's transform; the canvas state is the parent's content space.</summary>
-	public override void Draw(SKCanvas canvas)
+	/// <summary>Draws the children inside the group's transform; the canvas state is the parent's content space. Only children passing the activity filter are drawn.</summary>
+	public override void Draw(SKCanvas canvas, ScheduleActivity? filter)
 	{
 		var count = canvas.Save();
 		canvas.Translate(Position.X, Position.Y);
 		canvas.RotateDegrees(Rotation);
 		canvas.Scale(ScaleX, ScaleY);
+		var childFilter = ChildFilter(filter);
 		foreach (var child in children)
-			child.Draw(canvas);
+			if (child.PassesFilter(childFilter))
+				child.Draw(canvas, childFilter);
 		canvas.RestoreToCount(count);
 	}
 

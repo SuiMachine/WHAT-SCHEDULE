@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using SkiaSharp;
 using WhatSchedule.Controls.Dialogs;
+using WhatSchedule.Elements;
 using WhatSchedule.ViewModels;
 
 namespace WhatSchedule;
@@ -50,6 +51,21 @@ public partial class MainWindow : Window
 	private void OnMaximizeClick(object? sender, RoutedEventArgs e) => SetMaximized(WindowState != WindowState.Maximized);
 
 	private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
+
+	/// <summary>Applies the menu bar's activity filter to the canvas display; "None" clears it. Skipped during initialization, when the canvas is not bound yet.</summary>
+	private void OnTagFilterChanged(object? sender, SelectionChangedEventArgs e)
+	{
+		//The XAML's SelectedIndex fires this while InitializeComponent is still loading, before the canvas field is assigned.
+		if (Canvas is null)
+			return;
+
+		Canvas.TagFilter = TagFilter.SelectedIndex switch
+		{
+			1 => ScheduleActivity.Streaming,
+			2 => ScheduleActivity.TakingABreak,
+			_ => null
+		};
+	}
 
 	private void SetMaximized(bool maximized) => WindowState = maximized ? WindowState.Maximized : WindowState.Normal;
 

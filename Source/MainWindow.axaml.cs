@@ -97,6 +97,9 @@ public partial class MainWindow : Window
 
 	private void OnExitClick(object? sender, EventArgs e) => Close();
 
+	//The picked week is not consumed anywhere yet; the picker only returns it.
+	private async void OnSelectWeekClick(object? sender, EventArgs e) => _ = await WeekPickerDialog.PickWeek(this);
+
 	//Added elements land in the top left corner of the document, since a menu click carries no canvas position.
 
 	private async void OnAddLabelClick(object? sender, EventArgs e) => await Canvas.Menus.AddLabelAsync(new SKPoint(0, 0));

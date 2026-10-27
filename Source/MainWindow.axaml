@@ -86,6 +86,14 @@
 					</NativeMenu>
 				</NativeMenuItem.Menu>
 			</NativeMenuItem>
+			<!--The week picker only returns its selection; the schedule does not consume it yet.-->
+			<NativeMenuItem Header="Schedule">
+				<NativeMenuItem.Menu>
+					<NativeMenu>
+						<NativeMenuItem Header="Select Week..." Click="OnSelectWeekClick" />
+					</NativeMenu>
+				</NativeMenuItem.Menu>
+			</NativeMenuItem>
 			<!--Added elements land in the top left corner, since a menu click carries no canvas position.-->
 			<NativeMenuItem Header="Add...">
 				<NativeMenuItem.Menu>

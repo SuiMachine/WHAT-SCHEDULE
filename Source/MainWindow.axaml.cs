@@ -97,8 +97,19 @@ public partial class MainWindow : Window
 
 	private void OnExitClick(object? sender, EventArgs e) => Close();
 
-	//The picked week is not consumed anywhere yet; the picker only returns it.
-	private async void OnSelectWeekClick(object? sender, EventArgs e) => _ = await WeekPickerDialog.PickWeek(this);
+	//The picked week and its date culture land on the document, so the days' date variables follow the selection.
+	private async void OnSelectWeekClick(object? sender, EventArgs e)
+	{
+		if (DataContext is not MainWindowViewModel viewModel)
+			return;
+
+		if (await WeekPickerDialog.PickWeek(this, viewModel.Document.Week) is { } selection)
+		{
+			viewModel.Document.Week.WeekStart = selection.Week.Start;
+			viewModel.Document.Week.DateCulture = selection.DateCulture;
+			viewModel.Document.RaiseChanged();
+		}
+	}
 
 	//Only the editor's OK applies the week and the variables to the document; Cancel keeps the previous ones.
 	private async void OnEditScheduleClick(object? sender, EventArgs e)

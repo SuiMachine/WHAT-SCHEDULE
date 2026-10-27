@@ -27,21 +27,41 @@ public sealed class ScheduleWeek
 	/// <summary>How the week's stream start times are displayed as text, e.g. "17:30" or "5:30 PM".</summary>
 	public ScheduleTimeFormat TimeFormat { get; set; } = ScheduleTimeFormat.Hour24;
 
+	/// <summary>The Monday the week starts on, which the days' dates derive from; initialized to the current week's Monday.</summary>
+	public DateOnly? WeekStart { get; set; } = CurrentWeekStart();
+
+	/// <summary>The culture the week's dates are displayed as text, e.g. "Feb 3" or "lut 3".</summary>
+	public ScheduleDateCulture DateCulture { get; set; } = ScheduleDateCulture.Local;
+
 	/// <summary>A deep copy of the week, so an editor can modify one without touching the other.</summary>
 	public ScheduleWeek Copy() => new()
 	{
 		TimeFormat = TimeFormat,
+		WeekStart = WeekStart,
+		DateCulture = DateCulture,
 		Days = [.. Days.Select(day => new ScheduleDayEntry { StreamTitle = day.StreamTitle, IsStreaming = day.IsStreaming, StreamTime = day.StreamTime })],
 	};
 
-	/// <summary>All variables the week defines, one title and one start time per day, each with the value it produces.</summary>
+	/// <summary>All variables the week defines, per day its stream title and start time plus its three date forms, each with the value it produces.</summary>
 	public IReadOnlyList<ScheduleVariable> Variables => [.. Enum.GetValues<ScheduleDay>().SelectMany(EnumerateDay)];
 
-	/// <summary>The two variables one day of the week defines: its stream title and its formatted start time.</summary>
+	/// <summary>The five variables one day of the week defines: its stream title, its formatted start time, and its three date forms.</summary>
 	private IEnumerable<ScheduleVariable> EnumerateDay(ScheduleDay day)
 	{
 		var entry = Days[(int)day];
+		var date = WeekStart?.AddDays((int)day);
+		var culture = ScheduleDates.Resolve(DateCulture);
 		yield return new ScheduleVariable(ScheduleVariables.TitleName(day), entry.StreamTitle);
 		yield return new ScheduleVariable(ScheduleVariables.TimeName(day), ScheduleTimeFormatting.Format(entry.StreamTime ?? ScheduleDayEntry.DefaultStreamTime, TimeFormat));
+		yield return new ScheduleVariable(ScheduleVariables.DateName(day), date?.ToString("MMM d", culture));
+		yield return new ScheduleVariable(ScheduleVariables.DateLongName(day), date?.ToString("MMMM d", culture));
+		yield return new ScheduleVariable(ScheduleVariables.DayName(day), date?.Day.ToString(culture));
+	}
+
+	/// <summary>The Monday of the week that contains today.</summary>
+	private static DateOnly CurrentWeekStart()
+	{
+		var today = DateOnly.FromDateTime(DateTime.Now);
+		return today.AddDays(-(((int)today.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7));
 	}
 }

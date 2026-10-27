@@ -16,8 +16,8 @@ namespace WhatSchedule.Controls.Dialogs
 	/// </summary>
 	public sealed class ScheduleEditorDialog : Window
 	{
-		/// <summary>The start time days without one are initialized with when the editor opens.</summary>
-		private static readonly TimeOnly DefaultStreamTime = new(17, 30);
+		/// <summary>The start time the day rows' pickers are initialized with when an entry carries none.</summary>
+		private static TimeOnly DefaultStreamTime => ScheduleDayEntry.DefaultStreamTime;
 
 		private readonly List<TextBox> titleBoxes = [];
 		private readonly List<CheckBox> streamingToggles = [];

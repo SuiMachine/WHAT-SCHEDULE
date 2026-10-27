@@ -100,6 +100,20 @@ public partial class MainWindow : Window
 	//The picked week is not consumed anywhere yet; the picker only returns it.
 	private async void OnSelectWeekClick(object? sender, EventArgs e) => _ = await WeekPickerDialog.PickWeek(this);
 
+	//Only the editor's OK applies the week and the variables to the document; Cancel keeps the previous ones.
+	private async void OnEditScheduleClick(object? sender, EventArgs e)
+	{
+		if (DataContext is not MainWindowViewModel viewModel)
+			return;
+
+		if (await ScheduleEditorDialog.EditSchedule(this, viewModel.Document.Week, viewModel.Document.Variables) is { } edit)
+		{
+			viewModel.Document.Week = edit.Week;
+			viewModel.Document.Variables = edit.Variables;
+			viewModel.Document.RaiseChanged();
+		}
+	}
+
 	//Added elements land in the top left corner of the document, since a menu click carries no canvas position.
 
 	private async void OnAddLabelClick(object? sender, EventArgs e) => await Canvas.Menus.AddLabelAsync(new SKPoint(0, 0));

@@ -91,6 +91,7 @@
 				<NativeMenuItem.Menu>
 					<NativeMenu>
 						<NativeMenuItem Header="Select Week..." Click="OnSelectWeekClick" />
+						<NativeMenuItem Header="Edit Schedule..." Click="OnEditScheduleClick" />
 					</NativeMenu>
 				</NativeMenuItem.Menu>
 			</NativeMenuItem>

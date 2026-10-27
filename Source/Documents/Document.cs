@@ -20,6 +20,12 @@ public sealed class Document
 	/// <summary>Undo/redo history of the changes made to this document.</summary>
 	public DocumentHistory History { get; } = new();
 
+	/// <summary>The week this schedule covers: the stream title, whether and when the streamer streams on each of its seven days.</summary>
+	public ScheduleWeek Week { get; set; } = new();
+
+	/// <summary>The document's custom variables, referenced by name from schedule labels; day titles like "Monday_Title" are reserved for the week data.</summary>
+	public Dictionary<string, string> Variables { get; set; } = new(ScheduleVariables.NameComparer);
+
 	public SKBitmap? Background { get; set; }
 
 	public int Width => Background?.Width ?? 0;

@@ -7,6 +7,7 @@ using Avalonia.Media.Immutable;
 using SkiaSharp;
 using System.Globalization;
 using WhatSchedule.Controls.Dialogs;
+using WhatSchedule.Documents;
 using WhatSchedule.Elements;
 
 namespace WhatSchedule.Controls;
@@ -98,6 +99,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddToggle(string header, Func<bool> getter, Action<bool> setter) => AddToggle(header, getter, setter);
 	void IInspectorBuilder.AddSlider(string header, float minimum, float maximum, Func<float> getter, Action<float> setter) => AddSlider(header, minimum, maximum, getter, setter);
 	void IInspectorBuilder.AddColor(string header, Func<SKColor> getter, Action<SKColor> setter) => AddColor(header, getter, setter);
+	void IInspectorBuilder.AddVariablePicker(Action<string> insert) => AddVariablePicker(insert);
 	void IInspectorBuilder.AddFontBox(string header, Func<string> getter, Action<string> setter) => AddFontBox(header, getter, setter);
 	void IInspectorBuilder.AddSync(Action sync) => syncCallbacks.Add(sync);
 	void IInspectorBuilder.Apply(string description, Action mutation) => Apply(description, mutation);
@@ -647,6 +649,25 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		};
 		AddRow(header, editor);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
+	}
+
+	/// <summary>A button that opens the schedule's variables; the name of the one the user picks is handed to
+	/// <paramref name="insert"/>, recorded in the undo history as a single step.</summary>
+	private void AddVariablePicker(Action<string> insert)
+	{
+		var button = new Button { Content = "Use variable", HorizontalAlignment = HorizontalAlignment.Left };
+		button.Click += async (_, _) =>
+		{
+			var owner = TopLevel.GetTopLevel(this) as Window;
+			var document = canvas?.Document;
+			if (owner is null || document is null)
+				return;
+
+			if (await VariableListDialog.PickVariable(owner, ScheduleVariables.Collect(document)) is { } name)
+				Apply("Use variable", () => insert(name));
+		};
+
+		AddRow(string.Empty, button);
 	}
 
 	/// <summary>A combo box of the installed font families, with the element's family preselected.</summary>

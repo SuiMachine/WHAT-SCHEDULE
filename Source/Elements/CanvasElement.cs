@@ -2,6 +2,7 @@
 // But it is an abstract base class, so I am willing to accept it - Sui
 using Avalonia.Input;
 using SkiaSharp;
+using WhatSchedule.Documents;
 
 namespace WhatSchedule.Elements;
 
@@ -12,6 +13,9 @@ public abstract class CanvasElement
 {
 	/// <summary>The group this element lives in, or null when it sits at the document root.</summary>
 	public GroupElement? Parent { get; internal set; }
+
+	/// <summary>The document the element sits in, so it can resolve variable references while rendered; null until the element is inserted into one.</summary>
+	public Document? Document { get; internal set; }
 
 	/// <summary>The position of the element's top-left corner in the parent's content space, before rotation; document space at the root.</summary>
 	public SKPoint Position { get; set; }

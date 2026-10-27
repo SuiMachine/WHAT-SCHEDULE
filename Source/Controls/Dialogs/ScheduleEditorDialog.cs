@@ -11,8 +11,8 @@ namespace WhatSchedule.Controls.Dialogs
 
 	/// <summary>
 	/// An editor for the schedule: one row per day with the stream's title, whether the streamer streams
-	/// that day and when the stream starts, plus the custom variables. The day titles (e.g. "Monday_Title")
-	/// are reserved variables. OK returns the edited schedule; Cancel changes nothing.
+	/// that day and when the stream starts, plus the custom variables. The day data (e.g. "Monday_Title",
+	/// "Monday_Time") is reserved variables. OK returns the edited schedule; Cancel changes nothing.
 	/// </summary>
 	public sealed class ScheduleEditorDialog : Window
 	{
@@ -31,6 +31,12 @@ namespace WhatSchedule.Controls.Dialogs
 
 		/// <summary>Kept enabled only while every variable name is set, unique and free of the reserved day names.</summary>
 		private readonly Button okButton = new() { Content = "OK", IsDefault = true };
+
+		/// <summary>Picks how the week's stream start times are displayed, e.g. "17:30" or "5:30 PM".</summary>
+		private readonly ComboBox timeFormatBox = new()
+		{
+			ItemsSource = new[] { "24-hour (17:30)", "12-hour (5:30 PM)" },
+		};
 
 		private ScheduleEditorDialog(ScheduleWeek week, Dictionary<string, string> variables)
 		{
@@ -76,10 +82,24 @@ namespace WhatSchedule.Controls.Dialogs
 				Children = { okButton, cancelButton },
 			};
 
+			//Sits right under Sunday; the choice applies to the week like the rows above it.
+			timeFormatBox.SelectedIndex = week.TimeFormat == ScheduleTimeFormat.Hour12 ? 1 : 0;
+			var timeFormatSection = new StackPanel
+			{
+				Orientation = Orientation.Horizontal,
+				Margin = new Avalonia.Thickness(0, 12, 0, 0),
+				Spacing = 6,
+				Children =
+				{
+					new TextBlock { Text = "Time format:", VerticalAlignment = VerticalAlignment.Center },
+					timeFormatBox,
+				},
+			};
+
 			var header = new TextBlock { Text = "Custom variables", FontWeight = FontWeight.Bold };
 			var hint = new TextBlock
 			{
-				Text = "Names cannot be empty, duplicated or reserved; the day titles (e.g. \"Monday_Title\") are reserved.",
+				Text = "Names cannot be empty, duplicated or reserved; the day data (e.g. \"Monday_Title\", \"Monday_Time\") is reserved.",
 				TextWrapping = TextWrapping.Wrap,
 				Foreground = ThemeDefinition.RulerTick,
 				Margin = new Avalonia.Thickness(0, 0, 0, 4),
@@ -100,16 +120,17 @@ namespace WhatSchedule.Controls.Dialogs
 			Grid.SetRow(listScroll, 2);
 			Grid.SetRow(addVariableButton, 3);
 
-			//The day rows and the buttons take what they need; the variable list fills the height between them.
+			//The day rows, the time format and the buttons take what they need; the variable list fills the height between them.
 			Content = new Grid
 			{
 				Margin = new Avalonia.Thickness(12),
-				RowDefinitions = new RowDefinitions("Auto,*,Auto"),
-				Children = { grid, variablesSection, buttons },
+				RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"),
+				Children = { grid, timeFormatSection, variablesSection, buttons },
 			};
 			Grid.SetRow(grid, 0);
-			Grid.SetRow(variablesSection, 1);
-			Grid.SetRow(buttons, 2);
+			Grid.SetRow(timeFormatSection, 1);
+			Grid.SetRow(variablesSection, 2);
+			Grid.SetRow(buttons, 3);
 
 			foreach (var (name, value) in variables)
 				AddVariableRow(name, value);
@@ -177,22 +198,41 @@ namespace WhatSchedule.Controls.Dialogs
 			RefreshOkButton();
 		}
 
-		/// <summary>Enables OK only while every variable name is set, unique and free of the reserved day names.</summary>
+		/// <summary>Re-checks every variable name: OK stays enabled while all names are set and free, and a name
+		/// that is already used (a reserved day title or another row's name) gets a red outline on its box.</summary>
 		private void RefreshOkButton()
 		{
 			var names = new HashSet<string>(ScheduleVariables.NameComparer);
-			var valid = variableRows.All(row =>
+			var valid = true;
+			foreach (var row in variableRows)
 			{
 				var name = row.NameBox.Text?.Trim();
-				return !string.IsNullOrEmpty(name) && !ScheduleVariables.IsReserved(name) && names.Add(name);
-			});
+				if (string.IsNullOrEmpty(name))
+				{
+					//An empty box has no name to outline; it only keeps OK disabled.
+					row.NameBox.ClearValue(TextBox.BorderBrushProperty);
+					valid = false;
+					continue;
+				}
+
+				if (ScheduleVariables.IsReserved(name) || !names.Add(name))
+				{
+					row.NameBox.SetValue(TextBox.BorderBrushProperty, Brushes.Red);
+					valid = false;
+				}
+				else
+				{
+					row.NameBox.ClearValue(TextBox.BorderBrushProperty);
+				}
+			}
+
 			okButton.IsEnabled = valid;
 		}
 
 		/// <summary>Reads the edited week back from the controls, one entry per row.</summary>
 		private ScheduleWeek CollectWeek()
 		{
-			var week = new ScheduleWeek();
+			var week = new ScheduleWeek { TimeFormat = timeFormatBox.SelectedIndex == 1 ? ScheduleTimeFormat.Hour12 : ScheduleTimeFormat.Hour24 };
 			for (var day = 0; day < week.Days.Length; day++)
 			{
 				week.Days[day] = new ScheduleDayEntry

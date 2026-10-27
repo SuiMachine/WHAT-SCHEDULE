@@ -40,6 +40,10 @@ public interface IInspectorBuilder
 	/// <summary>A hex color editor (#RRGGBB or #RRGGBBAA) with a live swatch of the current color.</summary>
 	void AddColor(string header, Func<SKColor> getter, Action<SKColor> setter);
 
+	/// <summary>Adds a button that opens the schedule's variables and passes the name of the one the user
+	/// picks to <paramref name="insert"/>, which usually inserts it into a text.</summary>
+	void AddVariablePicker(Action<string> insert);
+
 	/// <summary>A combo box of the installed font families, with the element's family preselected.</summary>
 	void AddFontBox(string header, Func<string> getter, Action<string> setter);
 

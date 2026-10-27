@@ -23,7 +23,7 @@ public sealed class Document
 	/// <summary>The week this schedule covers: the stream title, whether and when the streamer streams on each of its seven days.</summary>
 	public ScheduleWeek Week { get; set; } = new();
 
-	/// <summary>The document's custom variables, referenced by name from schedule labels; day titles like "Monday_Title" are reserved for the week data.</summary>
+	/// <summary>The document's custom variables, referenced by name from schedule labels; the day data (e.g. "Monday_Title", "Monday_Time") is reserved for the week.</summary>
 	public Dictionary<string, string> Variables { get; set; } = new(ScheduleVariables.NameComparer);
 
 	public SKBitmap? Background { get; set; }
@@ -223,7 +223,17 @@ public sealed class Document
 			parent.InsertChild(element, index);
 		}
 
+		AssignDocument(element);
 		RaiseChanged();
+	}
+
+	/// <summary>Points the element and everything inside it at this document, so text can resolve the document's variables while rendered.</summary>
+	private void AssignDocument(CanvasElement element)
+	{
+		element.Document = this;
+		if (element is GroupElement group)
+			foreach (var child in group.Children)
+				AssignDocument(child);
 	}
 
 	/// <summary>Removes the element at <paramref name="index"/> from <paramref name="parent"/> (the root when null), recorded by undo actions.</summary>

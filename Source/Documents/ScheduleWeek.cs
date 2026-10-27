@@ -1,3 +1,5 @@
+using WhatSchedule.Elements;
+
 namespace WhatSchedule.Documents;
 
 /// <summary>The streamer's plan for one day of the week: the stream's title, whether it happens and when it starts.</summary>
@@ -19,9 +21,24 @@ public sealed class ScheduleWeek
 	/// <summary>The seven day entries, indexed by <see cref="WhatSchedule.Elements.ScheduleDay"/>, Monday first.</summary>
 	public ScheduleDayEntry[] Days { get; set; } = [new(), new(), new(), new(), new(), new(), new()];
 
+	/// <summary>How the week's stream start times are displayed as text, e.g. "17:30" or "5:30 PM".</summary>
+	public ScheduleTimeFormat TimeFormat { get; set; } = ScheduleTimeFormat.Hour24;
+
 	/// <summary>A deep copy of the week, so an editor can modify one without touching the other.</summary>
 	public ScheduleWeek Copy() => new()
 	{
+		TimeFormat = TimeFormat,
 		Days = [.. Days.Select(day => new ScheduleDayEntry { StreamTitle = day.StreamTitle, IsStreaming = day.IsStreaming, StreamTime = day.StreamTime })],
 	};
+
+	/// <summary>All variables the week defines, one title and one start time per day, each with the value it produces.</summary>
+	public IReadOnlyList<ScheduleVariable> Variables => [.. Enum.GetValues<ScheduleDay>().SelectMany(EnumerateDay)];
+
+	/// <summary>The two variables one day of the week defines: its stream title and its formatted start time.</summary>
+	private IEnumerable<ScheduleVariable> EnumerateDay(ScheduleDay day)
+	{
+		var entry = Days[(int)day];
+		yield return new ScheduleVariable(ScheduleVariables.TitleName(day), entry.StreamTitle);
+		yield return new ScheduleVariable(ScheduleVariables.TimeName(day), entry.StreamTime is { } time ? ScheduleTimeFormatting.Format(time, TimeFormat) : null);
+	}
 }

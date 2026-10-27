@@ -11,13 +11,20 @@ namespace WhatSchedule.Controls.Dialogs
 
 	/// <summary>
 	/// An editor for the schedule: one row per day with the stream's title, whether the streamer streams
-	/// that day and when the stream starts, plus the custom variables. The day data (e.g. "Monday_Title",
-	/// "Monday_Time") is reserved variables. OK returns the edited schedule; Cancel changes nothing.
+	/// that day and when the stream starts, plus the week's time zone, its converted times and the custom variables.
+	/// The day data (e.g. "Monday_Time", "Monday_Time_ET") is reserved variables. OK returns the edited schedule;
+	/// Cancel changes nothing.
 	/// </summary>
 	public sealed class ScheduleEditorDialog : Window
 	{
 		/// <summary>The start time the day rows' pickers are initialized with when an entry carries none.</summary>
 		private static TimeOnly DefaultStreamTime => ScheduleDayEntry.DefaultStreamTime;
+
+		/// <summary>The week the editor was opened on, whose start, date culture and zone the edited week keeps.</summary>
+		private readonly ScheduleWeek week;
+
+		/// <summary>The zone the edited week's times belong to, as a portable ID; null means the system's local zone.</summary>
+		private string? homeZoneId;
 
 		private readonly List<TextBox> titleBoxes = [];
 		private readonly List<CheckBox> streamingToggles = [];
@@ -29,7 +36,13 @@ namespace WhatSchedule.Controls.Dialogs
 		/// <summary>The vertical list the custom variable rows sit in.</summary>
 		private readonly StackPanel variableList = new() { Spacing = 4 };
 
-		/// <summary>Kept enabled only while every variable name is set, unique and free of the reserved day names.</summary>
+		/// <summary>The conversion rows in the list, one per converted time zone.</summary>
+		private readonly List<ConversionRow> conversionRows = [];
+
+		/// <summary>The vertical list the conversion rows sit in.</summary>
+		private readonly StackPanel conversionList = new() { Spacing = 4 };
+
+		/// <summary>Kept enabled only while every variable name is set, unique and free of the reserved names, and every conversion suffix is set, well-formed and unique.</summary>
 		private readonly Button okButton = new() { Content = "OK", IsDefault = true };
 
 		/// <summary>Picks how the week's stream start times are displayed, e.g. "17:30" or "5:30 PM".</summary>
@@ -40,6 +53,8 @@ namespace WhatSchedule.Controls.Dialogs
 
 		private ScheduleEditorDialog(ScheduleWeek week, Dictionary<string, string> variables)
 		{
+			this.week = week;
+			homeZoneId = week.TimeZoneId;
 			Title = "Edit Week";
 			WindowStartupLocation = WindowStartupLocation.CenterOwner;
 			CanResize = true;
@@ -82,24 +97,77 @@ namespace WhatSchedule.Controls.Dialogs
 				Children = { okButton, cancelButton },
 			};
 
-			//Sits right under Sunday; the choice applies to the week like the rows above it.
+			//The settings sit right under Sunday; each choice applies to the week like the rows above it.
 			timeFormatBox.SelectedIndex = week.TimeFormat == ScheduleTimeFormat.Hour12 ? 1 : 0;
-			var timeFormatSection = new StackPanel
+
+			//The zone the week's start times belong to; the conversions convert out of it.
+			var homeZoneButton = new Button { Content = ZoneButtonText(homeZoneId) };
+			homeZoneButton.Click += async (_, _) =>
 			{
-				Orientation = Orientation.Horizontal,
+				if (await TimeZonePickerDialog.PickZone(this) is { } selection)
+				{
+					homeZoneId = selection.TimeZoneId;
+					homeZoneButton.Content = ZoneButtonText(homeZoneId);
+				}
+			};
+
+			var settingsSection = new StackPanel
+			{
 				Margin = new Avalonia.Thickness(0, 12, 0, 0),
 				Spacing = 6,
 				Children =
 				{
-					new TextBlock { Text = "Time format:", VerticalAlignment = VerticalAlignment.Center },
-					timeFormatBox,
+					new StackPanel
+					{
+						Orientation = Orientation.Horizontal,
+						Spacing = 6,
+						Children =
+						{
+							new TextBlock { Text = "Time format:", VerticalAlignment = VerticalAlignment.Center },
+							timeFormatBox,
+						},
+					},
+					new StackPanel
+					{
+						Orientation = Orientation.Horizontal,
+						Spacing = 6,
+						Children =
+						{
+							new TextBlock { Text = "Time zone:", VerticalAlignment = VerticalAlignment.Center },
+							homeZoneButton,
+						},
+					},
 				},
 			};
+
+			//The header, the hint and the add button take what they need; the list scrolls within the room left to it.
+			var conversionsHeader = new TextBlock { Text = "Converted times", FontWeight = FontWeight.Bold };
+			var conversionsHint = new TextBlock
+			{
+				Text = "Each conversion shows every day's start time in its zone, e.g. suffix \"ET\" for New York yields \"Monday_Time_ET\" and \"Monday_Weekday_ET\".",
+				TextWrapping = TextWrapping.Wrap,
+				Foreground = ThemeDefinition.RulerTick,
+				Margin = new Avalonia.Thickness(0, 0, 0, 4),
+			};
+			var conversionsScroll = new ScrollViewer { Content = conversionList, MaxHeight = 140, Margin = new Avalonia.Thickness(0, 4, 0, 4) };
+			var addConversionButton = new Button { Content = "Add conversion", HorizontalAlignment = HorizontalAlignment.Left };
+			addConversionButton.Click += (_, _) => AddConversionRow("", null);
+
+			var conversionsSection = new Grid
+			{
+				RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
+				Margin = new Avalonia.Thickness(0, 12, 0, 0),
+				Children = { conversionsHeader, conversionsHint, conversionsScroll, addConversionButton },
+			};
+			Grid.SetRow(conversionsHeader, 0);
+			Grid.SetRow(conversionsHint, 1);
+			Grid.SetRow(conversionsScroll, 2);
+			Grid.SetRow(addConversionButton, 3);
 
 			var header = new TextBlock { Text = "Custom variables", FontWeight = FontWeight.Bold };
 			var hint = new TextBlock
 			{
-				Text = "Names cannot be empty, duplicated or reserved; the day data (e.g. \"Monday_Title\", \"Monday_Time\") is reserved.",
+				Text = "Names cannot be empty, duplicated or reserved; the day data (e.g. \"Monday_Title\", \"Monday_Time\") and its converted times (e.g. \"Monday_Time_ET\") are reserved.",
 				TextWrapping = TextWrapping.Wrap,
 				Foreground = ThemeDefinition.RulerTick,
 				Margin = new Avalonia.Thickness(0, 0, 0, 4),
@@ -120,18 +188,21 @@ namespace WhatSchedule.Controls.Dialogs
 			Grid.SetRow(listScroll, 2);
 			Grid.SetRow(addVariableButton, 3);
 
-			//The day rows, the time format and the buttons take what they need; the variable list fills the height between them.
+			//The day rows, the settings, the conversions and the buttons take what they need; the variable list fills the height between them.
 			Content = new Grid
 			{
 				Margin = new Avalonia.Thickness(12),
-				RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"),
-				Children = { grid, timeFormatSection, variablesSection, buttons },
+				RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto"),
+				Children = { grid, settingsSection, conversionsSection, variablesSection, buttons },
 			};
 			Grid.SetRow(grid, 0);
-			Grid.SetRow(timeFormatSection, 1);
-			Grid.SetRow(variablesSection, 2);
-			Grid.SetRow(buttons, 3);
+			Grid.SetRow(settingsSection, 1);
+			Grid.SetRow(conversionsSection, 2);
+			Grid.SetRow(variablesSection, 3);
+			Grid.SetRow(buttons, 4);
 
+			foreach (var conversion in week.Conversions)
+				AddConversionRow(conversion.Suffix, conversion.TimeZoneId);
 			foreach (var (name, value) in variables)
 				AddVariableRow(name, value);
 		}
@@ -198,12 +269,67 @@ namespace WhatSchedule.Controls.Dialogs
 			RefreshOkButton();
 		}
 
-		/// <summary>Re-checks every variable name: OK stays enabled while all names are set and free, and a name
-		/// that is already used (a reserved day title or another row's name) gets a red outline on its box.</summary>
+		/// <summary>Appends a conversion row with the given suffix and zone, or an empty one for a new conversion.</summary>
+		private void AddConversionRow(string suffix, string? timeZoneId)
+		{
+			var conversionRow = new ConversionRow { TimeZoneId = timeZoneId };
+			conversionRow.SuffixBox.Text = suffix;
+			conversionRow.ZoneButton.Content = ZoneButtonText(timeZoneId);
+			conversionRow.SuffixBox.TextChanged += (_, _) => RefreshOkButton();
+			conversionRow.ZoneButton.Click += async (_, _) =>
+			{
+				if (await TimeZonePickerDialog.PickZone(this) is { } selection)
+				{
+					conversionRow.TimeZoneId = selection.TimeZoneId;
+					conversionRow.ZoneButton.Content = ZoneButtonText(conversionRow.TimeZoneId);
+				}
+			};
+			conversionRow.RemoveRequested += () => RemoveConversionRow(conversionRow);
+			conversionList.Children.Add(conversionRow);
+			conversionRows.Add(conversionRow);
+			RefreshOkButton();
+		}
+
+		/// <summary>Removes a conversion row from the list.</summary>
+		private void RemoveConversionRow(ConversionRow row)
+		{
+			conversionList.Children.Remove(row);
+			conversionRows.Remove(row);
+			RefreshOkButton();
+		}
+
+		/// <summary>The zone a portable ID names, as the pickers show it, e.g. "(UTC+01:00) Warszawa"; a null ID is the system's local zone.</summary>
+		private static string ZoneButtonText(string? id) => id is null ? "System local" : ScheduleZones.Resolve(id).DisplayName;
+
+		/// <summary>Whether a conversion suffix can build variable names: set, and letters, digits and underscores only.</summary>
+		private static bool IsValidSuffix(string suffix) =>
+			suffix.Length > 0 && suffix.All(character => char.IsLetterOrDigit(character) || character == '_');
+
+		/// <summary>Re-checks every conversion suffix and variable name: OK stays enabled while every suffix is set,
+		/// well-formed and unique, and every variable name is set and free; anything that is already used (a reserved day
+		/// name, a name a conversion builds, or another row's name) gets a red outline on its box.</summary>
 		private void RefreshOkButton()
 		{
-			var names = new HashSet<string>(ScheduleVariables.NameComparer);
+			//The well-formed suffixes the rows currently build variable names from; the malformed ones only keep OK disabled.
+			var conversions = new List<ScheduleZoneConversion>();
+			var suffixes = new HashSet<string>(ScheduleVariables.NameComparer);
 			var valid = true;
+			foreach (var row in conversionRows)
+			{
+				var suffix = row.SuffixBox.Text?.Trim() ?? "";
+				if (!IsValidSuffix(suffix) || !suffixes.Add(suffix))
+				{
+					row.SuffixBox.SetValue(TextBox.BorderBrushProperty, Brushes.Red);
+					valid = false;
+				}
+				else
+				{
+					row.SuffixBox.ClearValue(TextBox.BorderBrushProperty);
+					conversions.Add(new ScheduleZoneConversion { Suffix = suffix, TimeZoneId = row.TimeZoneId });
+				}
+			}
+
+			var names = new HashSet<string>(ScheduleVariables.NameComparer);
 			foreach (var row in variableRows)
 			{
 				var name = row.NameBox.Text?.Trim();
@@ -215,7 +341,7 @@ namespace WhatSchedule.Controls.Dialogs
 					continue;
 				}
 
-				if (ScheduleVariables.IsReserved(name) || !names.Add(name))
+				if (ScheduleVariables.IsReserved(name, conversions) || !names.Add(name))
 				{
 					row.NameBox.SetValue(TextBox.BorderBrushProperty, Brushes.Red);
 					valid = false;
@@ -229,13 +355,22 @@ namespace WhatSchedule.Controls.Dialogs
 			okButton.IsEnabled = valid;
 		}
 
-		/// <summary>Reads the edited week back from the controls, one entry per row.</summary>
+		/// <summary>Reads the edited week back from the controls, one entry per row. The week's start, date culture and
+		/// time zone carry over from the week the editor was opened on; the day rows and conversions come from the controls.</summary>
 		private ScheduleWeek CollectWeek()
 		{
-			var week = new ScheduleWeek { TimeFormat = timeFormatBox.SelectedIndex == 1 ? ScheduleTimeFormat.Hour12 : ScheduleTimeFormat.Hour24 };
-			for (var day = 0; day < week.Days.Length; day++)
+			var edited = new ScheduleWeek
 			{
-				week.Days[day] = new ScheduleDayEntry
+				TimeFormat = timeFormatBox.SelectedIndex == 1 ? ScheduleTimeFormat.Hour12 : ScheduleTimeFormat.Hour24,
+				//The week picker owns the week's start and date culture; editing the day rows must not reset them.
+				WeekStart = week.WeekStart,
+				DateCulture = week.DateCulture,
+				TimeZoneId = homeZoneId,
+				Conversions = [.. conversionRows.Select(row => new ScheduleZoneConversion { Suffix = row.SuffixBox.Text!.Trim(), TimeZoneId = row.TimeZoneId })],
+			};
+			for (var day = 0; day < edited.Days.Length; day++)
+			{
+				edited.Days[day] = new ScheduleDayEntry
 				{
 					StreamTitle = titleBoxes[day].Text ?? "",
 					IsStreaming = streamingToggles[day].IsChecked == true,
@@ -243,7 +378,7 @@ namespace WhatSchedule.Controls.Dialogs
 				};
 			}
 
-			return week;
+			return edited;
 		}
 
 		/// <summary>Reads the custom variables back from the list's name and value boxes.</summary>
@@ -278,6 +413,36 @@ namespace WhatSchedule.Controls.Dialogs
 				Grid.SetColumn(remove, 2);
 				Children.Add(NameBox);
 				Children.Add(ValueBox);
+				Children.Add(remove);
+			}
+		}
+
+		/// <summary>One conversion's row in the list: its suffix box, the zone it converts into and the button removing the row.</summary>
+		private sealed class ConversionRow : Grid
+		{
+			/// <summary>The conversion's suffix box; an empty, malformed or duplicated suffix keeps OK disabled.</summary>
+			public TextBox SuffixBox { get; } = new() { PlaceholderText = "Suffix" };
+
+			/// <summary>The button showing the zone the conversion converts into; clicking it opens the zone picker.</summary>
+			public Button ZoneButton { get; } = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+
+			/// <summary>The zone the conversion converts into, as a portable ID; null converts into the system's local zone.</summary>
+			public string? TimeZoneId { get; set; }
+
+			/// <summary>Raised when the row's remove button is clicked.</summary>
+			public event Action? RemoveRequested;
+
+			public ConversionRow()
+			{
+				ColumnDefinitions = new ColumnDefinitions("90,*,Auto");
+				var remove = new Button { Content = "Remove", Margin = new Avalonia.Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+				remove.Click += (_, _) => RemoveRequested?.Invoke();
+
+				Grid.SetColumn(SuffixBox, 0);
+				Grid.SetColumn(ZoneButton, 1);
+				Grid.SetColumn(remove, 2);
+				Children.Add(SuffixBox);
+				Children.Add(ZoneButton);
 				Children.Add(remove);
 			}
 		}

@@ -33,19 +33,29 @@ public sealed class ScheduleWeek
 	/// <summary>The culture the week's dates are displayed as text, e.g. "Feb 3" or "lut 3".</summary>
 	public ScheduleDateCulture DateCulture { get; set; } = ScheduleDateCulture.Local;
 
+	/// <summary>The zone the week's stream start times belong to, as a portable (IANA) ID; null means the system's local zone.</summary>
+	public string? TimeZoneId { get; set; }
+
+	/// <summary>The named conversions of the week's stream start times into other time zones, each producing its own set of variables.</summary>
+	public List<ScheduleZoneConversion> Conversions { get; set; } = [];
+
 	/// <summary>A deep copy of the week, so an editor can modify one without touching the other.</summary>
 	public ScheduleWeek Copy() => new()
 	{
 		TimeFormat = TimeFormat,
 		WeekStart = WeekStart,
 		DateCulture = DateCulture,
+		TimeZoneId = TimeZoneId,
+		Conversions = [.. Conversions.Select(conversion => new ScheduleZoneConversion { Suffix = conversion.Suffix, TimeZoneId = conversion.TimeZoneId })],
 		Days = [.. Days.Select(day => new ScheduleDayEntry { StreamTitle = day.StreamTitle, IsStreaming = day.IsStreaming, StreamTime = day.StreamTime })],
 	};
 
-	/// <summary>All variables the week defines, per day its stream title and start time plus its three date forms, each with the value it produces.</summary>
+	/// <summary>All variables the week defines: per day its stream title, start time and three date forms, plus the converted
+	/// time, dates and weekday each of its conversions defines for that day, each with the value it produces.</summary>
 	public IReadOnlyList<ScheduleVariable> Variables => [.. Enum.GetValues<ScheduleDay>().SelectMany(EnumerateDay)];
 
-	/// <summary>The five variables one day of the week defines: its stream title, its formatted start time, and its three date forms.</summary>
+	/// <summary>The five variables one day of the week defines: its stream title, its formatted start time and its three date forms,
+	/// plus the converted variables each of the week's conversions defines for that day.</summary>
 	private IEnumerable<ScheduleVariable> EnumerateDay(ScheduleDay day)
 	{
 		var entry = Days[(int)day];
@@ -56,6 +66,24 @@ public sealed class ScheduleWeek
 		yield return new ScheduleVariable(ScheduleVariables.DateName(day), date?.ToString("MMM d", culture));
 		yield return new ScheduleVariable(ScheduleVariables.DateLongName(day), date?.ToString("MMMM d", culture));
 		yield return new ScheduleVariable(ScheduleVariables.DayName(day), date?.Day.ToString(culture));
+
+		//The conversion needs the concrete date: the zones' rules decide that occurrence's daylight saving, so the
+		//same wall time can convert differently in two different weeks. Without a week the dates stay empty like above.
+		if (date is not { } occurrence || Conversions.Count == 0)
+			yield break;
+
+		var time = entry.StreamTime ?? ScheduleDayEntry.DefaultStreamTime;
+		var from = ScheduleZones.Resolve(TimeZoneId);
+		foreach (var conversion in Conversions)
+		{
+			//The converted time can land on another day, so the dates and the weekday follow it there.
+			var converted = ScheduleZones.Convert(occurrence, time, from, ScheduleZones.Resolve(conversion.TimeZoneId));
+			yield return new ScheduleVariable(ScheduleVariables.ConvertedTimeName(day, conversion.Suffix), ScheduleTimeFormatting.Format(TimeOnly.FromDateTime(converted), TimeFormat));
+			yield return new ScheduleVariable(ScheduleVariables.ConvertedDateName(day, conversion.Suffix), converted.ToString("MMM d", culture));
+			yield return new ScheduleVariable(ScheduleVariables.ConvertedDateLongName(day, conversion.Suffix), converted.ToString("MMMM d", culture));
+			yield return new ScheduleVariable(ScheduleVariables.ConvertedDayName(day, conversion.Suffix), converted.Day.ToString(culture));
+			yield return new ScheduleVariable(ScheduleVariables.ConvertedWeekdayName(day, conversion.Suffix), culture.DateTimeFormat.GetDayName(converted.DayOfWeek));
+		}
 	}
 
 	/// <summary>The Monday of the week that contains today.</summary>

@@ -4,12 +4,12 @@ using WhatSchedule.Documents;
 
 namespace WhatSchedule.Controls.Dialogs
 {
-	/// <summary>A single-line text prompt; with variables it also offers a button inserting the reference of the one the user picks.</summary>
+	/// <summary>A single-line text prompt; with a document it also offers a button inserting the reference of the variable the user picks.</summary>
 	public sealed class TextPromptDialog : Window
 	{
 		private readonly TextBox textBox;
 
-		private TextPromptDialog(string title, string caption, string defaultText, IReadOnlyList<ScheduleVariable>? variables)
+		private TextPromptDialog(string title, string caption, string defaultText, Document? document)
 		{
 			Title = title;
 			WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -32,13 +32,13 @@ namespace WhatSchedule.Controls.Dialogs
 			cancelButton.Click += (_, _) => Close(null);
 
 			var buttons = new DockPanel();
-			if (variables is { Count: > 0 })
+			if (document is not null)
 			{
 				//The picked variable's reference lands in the text at the caret, so it can be placed between typed words.
 				var useVariableButton = new Button { Content = "Use variable" };
 				useVariableButton.Click += async (_, _) =>
 				{
-					if (await VariableListDialog.PickVariable(this, variables) is { } name)
+					if (await VariableListDialog.PickVariable(this, document) is { } name)
 						InsertVariable("{" + name + "}");
 				};
 				DockPanel.SetDock(useVariableButton, Dock.Left);
@@ -65,10 +65,10 @@ namespace WhatSchedule.Controls.Dialogs
 		}
 
 		/// <summary>Asks the user for a single line of text; returns null when the user cancels.
-		/// With <paramref name="variables"/>, a "Use variable" button inserts the reference of the picked one at the caret.</summary>
-		public static async Task<string?> ShowDialog(Window owner, string title, string caption, string defaultText = "", IReadOnlyList<ScheduleVariable>? variables = null)
+		/// With a <paramref name="document"/>, a "Use variable" button inserts the reference of the variable picked from it at the caret.</summary>
+		public static async Task<string?> ShowDialog(Window owner, string title, string caption, string defaultText = "", Document? document = null)
 		{
-			var dialog = new TextPromptDialog(title, caption, defaultText, variables);
+			var dialog = new TextPromptDialog(title, caption, defaultText, document);
 			return await dialog.ShowDialog<string?>(owner);
 		}
 

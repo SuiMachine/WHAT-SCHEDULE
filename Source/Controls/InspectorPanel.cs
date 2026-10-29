@@ -663,7 +663,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			if (owner is null || document is null)
 				return;
 
-			if (await VariableListDialog.PickVariable(owner, ScheduleVariables.Collect(document)) is { } name)
+			if (await VariableListDialog.PickVariable(owner, document) is { } name)
 				Apply("Use variable", () => insert(name));
 		};
 

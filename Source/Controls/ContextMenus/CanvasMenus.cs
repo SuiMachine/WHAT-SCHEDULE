@@ -154,7 +154,7 @@ internal sealed class CanvasMenus
 		if (TopLevel.GetTopLevel(canvas) is not Window window)
 			return;
 
-		var text = await TextPromptDialog.ShowDialog(window, "Add Label", "Label text", "Label");
+		var text = await TextPromptDialog.ShowDialog(window, "Add Label", "Label text", "", document);
 		if (string.IsNullOrWhiteSpace(text))
 			return;
 

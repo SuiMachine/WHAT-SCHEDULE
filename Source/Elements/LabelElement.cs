@@ -1,3 +1,4 @@
+using System.Text;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -5,6 +6,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using SkiaSharp;
+using WhatSchedule.Documents;
 using WhatSchedule.Rendering.Definitions;
 
 namespace WhatSchedule.Elements;
@@ -199,7 +201,10 @@ public sealed class LabelElement : CanvasElement
 		builder.AddNumber("Height", () => Size.Height, value => Height = (float)Math.Max(ThemeDefinition.MinElementSize, value));
 
 		builder.AddSection("Text");
-		builder.AddTextArea("Content change", () => Text, value => Text = value);
+		builder.AddTextArea("Content", () => Text, value => Text = value);
+		//Sits under the content editor; the picked variable's reference is appended to the text.
+		builder.AddVariablePicker(variable => Text += "{" + variable + "}");
+
 		builder.AddFontBox("Font", () => FontFamily, value => FontFamily = value);
 		builder.AddComboBox("Style", FontStyles.Select(style => style.Name).ToArray(), GetStyleName, SetStyle);
 		builder.AddNumber("Font Size", () => FontSize,
@@ -362,11 +367,48 @@ public sealed class LabelElement : CanvasElement
 
 	public sealed record LabelElementState(SKPoint Position, float Rotation, float? Width, float? Height, TextVerticalPlacement VerticalPlacement, string Text, string FontFamily, SKFontStyle FontStyle, float FontSize, float LetterSpacing, float Stretch, float Skew, float LineHeight, TextAlignment Alignment, TextTransform Transform, SKColor TextColor, float Opacity, bool GradientFill, SKColor GradientColor, float GradientAngle, SKColor OutlineColor, float OutlineWidth, OutlinePosition OutlinePosition, SKColor SecondOutlineColor, float SecondOutlineWidth, SKColor ShadowColor, float ShadowBlur, SKPoint ShadowOffset, SKBlendMode ShadowBlendMode, SKColor GlowColor, float GlowBlur, float Blur, SKBlendMode BlendMode, bool FlipX, bool FlipY) : ElementState;
 
+	/// <summary>Replaces every variable reference (e.g. "{Monday_Title}") with the value it currently produces
+	/// in the element's document; a name no variable defines keeps its braces, so a typo or a removed variable stays visible.</summary>
+	private string ResolveVariables(string text)
+	{
+		if (Document is not { } document || !text.Contains('{'))
+			return text;
+
+		var values = ScheduleVariables.Collect(document).ToDictionary(variable => variable.Name, variable => variable.Value ?? string.Empty, ScheduleVariables.NameComparer);
+
+		var resolved = new StringBuilder();
+		var index = 0;
+		while (index < text.Length)
+		{
+			var open = text.IndexOf('{', index);
+			if (open < 0)
+			{
+				resolved.Append(text, index, text.Length - index);
+				break;
+			}
+
+			resolved.Append(text, index, open - index);
+			var close = text.IndexOf('}', open + 1);
+			if (close < 0)
+			{
+				resolved.Append(text, open, text.Length - open);
+				break;
+			}
+
+			var name = text[(open + 1)..close].Trim();
+			resolved.Append(values.TryGetValue(name, out var value) ? value : text[open..(close + 1)]);
+			index = close + 1;
+		}
+
+		return resolved.ToString();
+	}
+
 	/// <summary>Builds the render options for the label's text; <paramref name="box"/> is the text box the text
-	/// is placed in, or null to treat the measured text itself as the box.</summary>
+	/// is placed in, or null to treat the measured text itself as the box. The text's variable references
+	/// are resolved into the values they currently produce.</summary>
 	private TextOverlayOptions BuildOptions(SKPoint position, SKSize? box = null) => new()
 	{
-		Text = Text,
+		Text = ResolveVariables(Text),
 		FontFamily = FontFamily,
 		FontStyle = FontStyle,
 		FontSize = FontSize,

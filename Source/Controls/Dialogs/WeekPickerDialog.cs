@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using WhatSchedule.Documents;
 using Calendar = Avalonia.Controls.Calendar;
 
 namespace WhatSchedule.Controls.Dialogs
@@ -16,7 +17,11 @@ namespace WhatSchedule.Controls.Dialogs
 		}
 	}
 
-	/// <summary>A picker that shows a month calendar and highlights the whole Monday–Sunday week of any day the user clicks.</summary>
+	/// <summary>The week selection the picker returns: the week's dates and the culture they are displayed with.</summary>
+	public readonly record struct WeekSelection(DateSegment Week, ScheduleDateCulture DateCulture);
+
+	/// <summary>A picker that shows a month calendar and highlights the whole Monday–Sunday week of any day the user clicks,
+	/// with the culture the week's dates are displayed as text picked alongside it.</summary>
 	public sealed class WeekPickerDialog : Window
 	{
 		private readonly Calendar calendar = new()
@@ -28,6 +33,12 @@ namespace WhatSchedule.Controls.Dialogs
 		private readonly TextBlock weekRange = new();
 		private readonly Button okButton = new() { Content = "OK", IsDefault = true };
 
+		/// <summary>Picks the culture the week's dates are displayed with, e.g. "Feb 3" (local) or "Feb 3" (en-US) on a Polish system.</summary>
+		private readonly ComboBox dateFormatBox = new()
+		{
+			ItemsSource = new[] { "Local culture", "English (US)" },
+		};
+
 		/// <summary>The Monday of the week currently selected on the calendar, or null when the selection is empty.</summary>
 		private DateOnly? selectedWeekStart;
 
@@ -37,7 +48,7 @@ namespace WhatSchedule.Controls.Dialogs
 		/// <summary>True while the picker sets the week selection itself; the calendar's change handler ignores changes made then.</summary>
 		private bool syncingSelection;
 
-		private WeekPickerDialog()
+		private WeekPickerDialog(ScheduleWeek week)
 		{
 			Title = "Select Week";
 			WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -50,10 +61,11 @@ namespace WhatSchedule.Controls.Dialogs
 			okButton.Click += (_, _) =>
 			{
 				if (selectedWeekStart is { } start)
-					Close(new DateSegment(start, start.AddDays(6)));
+					Close(new WeekSelection(new DateSegment(start, start.AddDays(6)), dateFormatBox.SelectedIndex == 1 ? ScheduleDateCulture.EnUs : ScheduleDateCulture.Local));
 			};
 			cancelButton.Click += (_, _) => Close(null);
 
+			dateFormatBox.SelectedIndex = week.DateCulture == ScheduleDateCulture.EnUs ? 1 : 0;
 			Content = new StackPanel
 			{
 				Margin = new Avalonia.Thickness(12),
@@ -65,6 +77,16 @@ namespace WhatSchedule.Controls.Dialogs
 					new StackPanel
 					{
 						Orientation = Orientation.Horizontal,
+						Spacing = 6,
+						Children =
+						{
+							new TextBlock { Text = "Date format:", VerticalAlignment = VerticalAlignment.Center },
+							dateFormatBox,
+						},
+					},
+					new StackPanel
+					{
+						Orientation = Orientation.Horizontal,
 						Spacing = 8,
 						HorizontalAlignment = HorizontalAlignment.Right,
 						Children = { okButton, cancelButton },
@@ -73,14 +95,14 @@ namespace WhatSchedule.Controls.Dialogs
 			};
 
 			calendar.SelectedDatesChanged += (_, _) => OnCalendarSelectionChanged();
-			SelectWeek(DateOnly.FromDateTime(DateTime.Now));
+			SelectWeek(week.WeekStart ?? DateOnly.FromDateTime(DateTime.Now));
 		}
 
-		/// <summary>Shows the picker and returns the Monday–Sunday week of the picked date, or null when the user cancels.</summary>
-		public static async Task<DateSegment?> PickWeek(Window owner)
+		/// <summary>Shows the picker with the given week's selection and date culture; returns the picked week and culture, or null when the user cancels.</summary>
+		public static async Task<WeekSelection?> PickWeek(Window owner, ScheduleWeek week)
 		{
-			var dialog = new WeekPickerDialog();
-			return await dialog.ShowDialog<DateSegment?>(owner);
+			var dialog = new WeekPickerDialog(week);
+			return await dialog.ShowDialog<WeekSelection?>(owner);
 		}
 
 		/// <summary>Re-selects the whole week of the day a user click introduced; only the calendar's own changes arrive here.</summary>
@@ -122,6 +144,8 @@ namespace WhatSchedule.Controls.Dialogs
 			foreach (var day in displayedWeek)
 				calendar.SelectedDates.Add(day);
 			syncingSelection = false;
+			//A week preselected from the document can lie in another month than the one the calendar opens on.
+			calendar.DisplayDate = week.Start.ToDateTime(TimeOnly.MinValue);
 
 			weekRange.Text = string.Create(CultureInfo.CurrentCulture, $"{week.Start:ddd yyyy-MM-dd} – {week.End:ddd yyyy-MM-dd}");
 			okButton.IsEnabled = true;

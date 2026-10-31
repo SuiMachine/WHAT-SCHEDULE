@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -9,7 +10,7 @@ namespace WhatSchedule.Controls.Dialogs
 {
 	/// <summary>A picker for the schedule's defined variables: one is picked by its category, then by the time
 	/// zone it belongs to, then by its day and format, so the schedule's whole variable space never shows as one
-	/// list. Picking a variable returns its name for the caller to insert.</summary>
+	/// list. The steps slide in the direction the picker travels. Picking a variable returns its name for the caller to insert.</summary>
 	public sealed class VariableListDialog : Window
 	{
 		/// <summary>The kinds the picker groups the schedule's variables into.</summary>
@@ -33,8 +34,12 @@ namespace WhatSchedule.Controls.Dialogs
 		/// <summary>The line above the current step, naming what the step asks for.</summary>
 		private readonly TextBlock caption = new() { Foreground = ThemeDefinition.RulerTick };
 
-		/// <summary>Stacks the current step's controls; the step is swapped by clearing and refilling it.</summary>
-		private readonly StackPanel step = new() { Spacing = 8 };
+		/// <summary>Shows the current step's controls, sliding the old step out and the new one in;
+		/// the step is swapped by giving the host new content.</summary>
+		private readonly TransitioningContentControl stepHost = new()
+		{
+			PageTransition = new PageSlide(TimeSpan.FromMilliseconds(200), PageSlide.SlideAxis.Horizontal),
+		};
 
 		/// <summary>Returns to the previous step; hidden in the first one.</summary>
 		private readonly Button backButton = new() { Content = "Back", IsVisible = false };
@@ -68,7 +73,7 @@ namespace WhatSchedule.Controls.Dialogs
 			{
 				Margin = new Thickness(12),
 				Spacing = 8,
-				Children = { caption, step, backButton },
+				Children = { caption, stepHost, backButton },
 			};
 
 			ShowCategory();
@@ -82,21 +87,21 @@ namespace WhatSchedule.Controls.Dialogs
 		}
 
 		/// <summary>The first step: the category, with the custom one offered only when the document defines any.</summary>
-		private void ShowCategory()
+		private void ShowCategory(bool backwards = false)
 		{
 			depth = 0;
 			backButton.IsVisible = false;
 			caption.Text = "Pick a category.";
-			step.Children.Clear();
-			Choice("Date", "The days' dates", () => ShowTimeZone(VariableCategory.Date));
-			Choice("Time", "The days' stream start times", () => ShowTimeZone(VariableCategory.Time));
-			Choice("Title", "The days' stream titles", () =>
+			var panel = NewStep(backwards);
+			Choice(panel, "Date", "The days' dates", () => ShowTimeZone(VariableCategory.Date));
+			Choice(panel, "Time", "The days' stream start times", () => ShowTimeZone(VariableCategory.Time));
+			Choice(panel, "Title", "The days' stream titles", () =>
 			{
 				category = VariableCategory.Title;
 				suffix = null;
 				ShowDays();
 			});
-			Choice("Custom", "The variables you defined", () =>
+			Choice(panel, "Custom", "The variables you defined", () =>
 			{
 				category = VariableCategory.Custom;
 				ShowCustom();
@@ -104,7 +109,7 @@ namespace WhatSchedule.Controls.Dialogs
 		}
 
 		/// <summary>The second step: the time zone the variables belong to, skipped when the week defines no conversion.</summary>
-		private void ShowTimeZone(VariableCategory picked)
+		private void ShowTimeZone(VariableCategory picked, bool backwards = false)
 		{
 			category = picked;
 
@@ -119,14 +124,14 @@ namespace WhatSchedule.Controls.Dialogs
 			backButton.IsVisible = true;
 			depth = 1;
 			caption.Text = "Pick the time zone.";
-			step.Children.Clear();
-			Choice("Base", "The schedule's own time zone", () =>
+			var panel = NewStep(backwards);
+			Choice(panel, "Base", "The schedule's own time zone", () =>
 			{
 				suffix = null;
 				ShowDays();
 			});
 			foreach (var conversion in conversions)
-				Choice(conversion.Suffix, "Converted into " + ScheduleZones.PortableId(ScheduleZones.Resolve(conversion.TimeZoneId)), () =>
+				Choice(panel, conversion.Suffix, "Converted into " + ScheduleZones.PortableId(ScheduleZones.Resolve(conversion.TimeZoneId)), () =>
 				{
 					suffix = conversion.Suffix;
 					ShowDays();
@@ -140,7 +145,7 @@ namespace WhatSchedule.Controls.Dialogs
 			depth = 2;
 			backButton.IsVisible = true;
 			caption.Text = "Pick the day" + (category == VariableCategory.Date ? " and the format." : ".");
-			step.Children.Clear();
+			var panel = NewStep(false);
 
 			(string Label, Func<ScheduleDay, string> Name)[] formats = category switch
 			{
@@ -195,7 +200,7 @@ namespace WhatSchedule.Controls.Dialogs
 				}
 			}
 
-			step.Children.Add(grid);
+			panel.Children.Add(grid);
 		}
 
 		/// <summary>The last step for the custom category: the variables the document defines, with the value each currently produces.</summary>
@@ -204,7 +209,7 @@ namespace WhatSchedule.Controls.Dialogs
 			depth = 2;
 			backButton.IsVisible = true;
 			caption.Text = "Pick a variable to insert it into the text.";
-			step.Children.Clear();
+			var panel = NewStep(false);
 
 			var list = new ListBox { ItemsSource = custom.Select(variable => $"{variable.Name} (\"{variable.Value}\")").ToArray(), MinWidth = 240, MaxHeight = 360 };
 			list.SelectionChanged += (_, _) =>
@@ -212,11 +217,11 @@ namespace WhatSchedule.Controls.Dialogs
 				if (list.SelectedIndex is >= 0 and var index)
 					Close(custom[index].Name);
 			};
-			step.Children.Add(list);
+			panel.Children.Add(list);
 		}
 
 		/// <summary>A full-width button with a title and a dim hint below it, running <paramref name="pick"/> when clicked.</summary>
-		private void Choice(string title, string hint, Action pick, bool enabled = true)
+		private static void Choice(StackPanel panel, string title, string hint, Action pick, bool enabled = true)
 		{
 			var button = new Button
 			{
@@ -235,7 +240,7 @@ namespace WhatSchedule.Controls.Dialogs
 				IsEnabled = enabled,
 			};
 			button.Click += (_, _) => pick();
-			step.Children.Add(button);
+			panel.Children.Add(button);
 		}
 
 		/// <summary>A cell showing the value the named variable currently produces, naming it in its tooltip;
@@ -255,14 +260,24 @@ namespace WhatSchedule.Controls.Dialogs
 			return button;
 		}
 
+		/// <summary>Starts a new step sliding in — forward steps from the right, backwards ones from the left —
+		/// and returns the panel the step's controls are added to.</summary>
+		private StackPanel NewStep(bool backwards)
+		{
+			stepHost.IsTransitionReversed = backwards;
+			var panel = new StackPanel { Spacing = 8 };
+			stepHost.Content = panel;
+			return panel;
+		}
+
 		/// <summary>Returns one step back: from the days or the custom list to the time zones when the category
 		/// passed through them, otherwise to the categories.</summary>
 		private void GoBack()
 		{
 			if (depth == 2 && (category == VariableCategory.Date || category == VariableCategory.Time) && conversions.Count > 0)
-				ShowTimeZone(category);
+				ShowTimeZone(category, true);
 			else
-				ShowCategory();
+				ShowCategory(true);
 		}
 	}
 }

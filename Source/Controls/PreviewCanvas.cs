@@ -66,7 +66,7 @@ public class PreviewCanvas : Control, IDisposable
 	/// <summary>The element copied by Ctrl+C or cut, waiting to be pasted.</summary>
 	private CanvasElement? clipboardElement;
 
-	/// <summary>How many times the current clipboard content was pasted, so each paste lands one step further from the corner.</summary>
+	/// <summary>How many times the current clipboard content was pasted, so each paste lands one step further from the original position.</summary>
 	private int pasteCount;
 
 	/// <summary>The gap between pasted elements, in document pixels.</summary>
@@ -208,14 +208,16 @@ public class PreviewCanvas : Control, IDisposable
 		return clone;
 	}
 
-	/// <summary>Pastes the clipboard element in the top left corner, every paste one step further away; Ctrl+V and Edit &gt; Paste.</summary>
+	/// <summary>Pastes the clipboard element at its original position, every paste one step further away; Ctrl+V and Edit &gt; Paste.</summary>
 	public bool PasteClipboard()
 	{
 		if (Document is not { } document || clipboardElement is null)
 			return false;
 
+		//The first paste lands where the element was copied from; repeats step away so they do not overlap exactly.
 		var element = clipboardElement.Clone();
-		element.Position = new SKPoint(PasteStep * pasteCount, PasteStep * pasteCount);
+		var step = PasteStep * pasteCount;
+		element.Position = new SKPoint(clipboardElement.Position.X + step, clipboardElement.Position.Y + step);
 		pasteCount++;
 
 		document.AddTracked(element);

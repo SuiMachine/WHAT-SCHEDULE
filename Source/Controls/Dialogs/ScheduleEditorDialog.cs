@@ -62,8 +62,10 @@ namespace WhatSchedule.Controls.Dialogs
 			Background = ThemeDefinition.Background;
 			Width = 560;
 			MinWidth = 520;
-			Height = 520;
 			MinHeight = 400;
+			//The window opens as tall as its content and stops fitting itself once shown, so it stays resizable.
+			SizeToContent = SizeToContent.Height;
+			Opened += (_, _) => SizeToContent = SizeToContent.Manual;
 
 			var grid = new Grid
 			{
@@ -87,7 +89,7 @@ namespace WhatSchedule.Controls.Dialogs
 			okButton.Click += (_, _) => Close(new ScheduleEdit(CollectWeek(), CollectVariables()));
 			cancelButton.Click += (_, _) => Close(null);
 
-			//Pinned to the bottom row; its top margin is the padding the variable list stops above.
+			//Pinned below the scrolling sections, so OK and Cancel stay visible however small the window gets.
 			var buttons = new StackPanel
 			{
 				Orientation = Orientation.Horizontal,
@@ -172,14 +174,15 @@ namespace WhatSchedule.Controls.Dialogs
 				Foreground = ThemeDefinition.RulerTick,
 				Margin = new Avalonia.Thickness(0, 0, 0, 4),
 			};
-			var listScroll = new ScrollViewer { Content = variableList, Margin = new Avalonia.Thickness(0, 4, 0, 4) };
+			//The list scrolls within its cap instead of growing the window without bound.
+			var listScroll = new ScrollViewer { Content = variableList, MaxHeight = 200, Margin = new Avalonia.Thickness(0, 4, 0, 4) };
 			var addVariableButton = new Button { Content = "Add variable", HorizontalAlignment = HorizontalAlignment.Left };
 			addVariableButton.Click += (_, _) => AddVariableRow("", "");
 
-			//The header, the hint and the add button take what they need; the list fills the height between them.
+			//The header, the hint, the capped list and the add button each take what they need.
 			var variablesSection = new Grid
 			{
-				RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"),
+				RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
 				Margin = new Avalonia.Thickness(0, 12, 0, 0),
 				Children = { header, hint, listScroll, addVariableButton },
 			};
@@ -188,18 +191,16 @@ namespace WhatSchedule.Controls.Dialogs
 			Grid.SetRow(listScroll, 2);
 			Grid.SetRow(addVariableButton, 3);
 
-			//The day rows, the settings, the conversions and the buttons take what they need; the variable list fills the height between them.
+			//The sections scroll when the window is shorter than they need; the buttons stay pinned to the bottom row.
+			var bodyScroll = new ScrollViewer { Content = new StackPanel { Children = { grid, settingsSection, conversionsSection, variablesSection } } };
 			Content = new Grid
 			{
 				Margin = new Avalonia.Thickness(12),
-				RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto"),
-				Children = { grid, settingsSection, conversionsSection, variablesSection, buttons },
+				RowDefinitions = new RowDefinitions("*,Auto"),
+				Children = { bodyScroll, buttons },
 			};
-			Grid.SetRow(grid, 0);
-			Grid.SetRow(settingsSection, 1);
-			Grid.SetRow(conversionsSection, 2);
-			Grid.SetRow(variablesSection, 3);
-			Grid.SetRow(buttons, 4);
+			Grid.SetRow(bodyScroll, 0);
+			Grid.SetRow(buttons, 1);
 
 			foreach (var conversion in week.Conversions)
 				AddConversionRow(conversion.Suffix, conversion.TimeZoneId);

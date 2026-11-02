@@ -1,3 +1,4 @@
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -194,23 +195,10 @@ public partial class MainWindowViewModel : ObservableObject
 		return document;
 	}
 
+	/// <summary>The background of a fresh document: the bundled example image.</summary>
 	private static SKBitmap CreateSampleBackground()
 	{
-		const int width = 1920;
-		const int height = 1080;
-
-		var bitmap = new SKBitmap(width, height);
-		using var canvas = new SKCanvas(bitmap);
-		using var paint = new SKPaint
-		{
-			Shader = SKShader.CreateLinearGradient(
-				new SKPoint(0, 0),
-				new SKPoint(width, height),
-				new[] { new SKColor(0x1E, 0x3A, 0x8A), new SKColor(0x9A, 0x3D, 0x8F) },
-				null,
-				SKShaderTileMode.Clamp),
-		};
-		canvas.DrawRect(0, 0, width, height, paint);
-		return bitmap;
+		using var stream = AssetLoader.Open(new Uri("avares://WhatSchedule/Assets/Example/background.png"));
+		return SKBitmap.Decode(stream);
 	}
 }

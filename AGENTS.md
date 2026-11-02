@@ -15,6 +15,13 @@ These come directly from AI_POLICY.md. No operator instruction overrides them.
 
 Permitted work: writing, editing, refactoring, and debugging source code; generating tests (which the contributor must verify as correct and meaningful); code review assistance where the final judgment stays with a human.
 
+## Assets (`Source/Assets`)
+
+- **Do not modify the directory.** Never create, edit, rename, convert, re-encode, "optimize", or delete any file in `Source/Assets`, even existing human-created ones. This extends rule 1: no asset enters or changes through AI work.
+- **Do not stage or commit asset changes.** Never `git add` files in `Source/Assets`, and never commit a change set that includes them. If the working tree contains asset modifications not made by the agent, leave them for the contributor.
+- **Referencing assets is fine.** Agents may reference existing assets from code or XAML (e.g. setting an icon path, embedding a resource in `Source/MainWindow.axaml`, loading an asset at runtime).
+- **If a task needs a new or changed asset** (new icon, modified image, etc.), stop and ask the contributor to provide it; do not generate a substitute.
+
 ## Repository facts
 
 - Desktop app for generating and editing stream schedules. UI is **Avalonia**, rasterization and image processing are **SkiaSharp**.

@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Example\active_day_left.png" />
+    <None Remove="Assets\Example\active_day_right.png" />
     <None Remove="Assets\Example\art_outline.png" />
     <None Remove="Assets\Example\background_outline.png" />
     <None Remove="Assets\Example\element_bg.png" />
@@ -29,6 +31,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\Example\active_day_left.png" />
+    <AvaloniaResource Include="Assets\Example\active_day_right.png" />
     <AvaloniaResource Include="Assets\Example\art_outline.png" />
     <AvaloniaResource Include="Assets\Example\background.png" />
     <AvaloniaResource Include="Assets\Example\background_outline.png" />

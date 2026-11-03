@@ -130,12 +130,15 @@ namespace WhatSchedule.Controls.Dialogs
 				suffix = null;
 				ShowDays();
 			});
+
 			foreach (var conversion in conversions)
+			{
 				Choice(panel, conversion.Suffix, "Converted into " + ScheduleZones.PortableId(ScheduleZones.Resolve(conversion.TimeZoneId)), () =>
 				{
 					suffix = conversion.Suffix;
 					ShowDays();
 				});
+			}
 		}
 
 		/// <summary>The last step for the date, time and title categories: one row per day, one column per format,

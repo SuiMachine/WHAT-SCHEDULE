@@ -6,6 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Example\art_outline.png" />
+    <None Remove="Assets\Example\background_outline.png" />
+    <None Remove="Assets\Example\element_bg.png" />
+    <None Remove="Assets\Example\outline.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
     <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.4" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
@@ -22,7 +29,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\Example\art_outline.png" />
     <AvaloniaResource Include="Assets\Example\background.png" />
+    <AvaloniaResource Include="Assets\Example\background_outline.png" />
+    <AvaloniaResource Include="Assets\Example\element_bg.png" />
+    <AvaloniaResource Include="Assets\Example\outline.png" />
   </ItemGroup>
 
 </Project>

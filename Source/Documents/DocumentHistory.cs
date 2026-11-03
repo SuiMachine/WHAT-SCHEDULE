@@ -229,4 +229,22 @@ namespace WhatSchedule.Documents
 			document.RaiseChanged();
 		}
 	}
+
+	/// <summary>Several changes recorded as one, undone together in reverse order and redone together in their original order.</summary>
+	internal sealed class CompositeAction(string description, IReadOnlyList<IHistoryAction> actions) : IHistoryAction
+	{
+		public string Description => description;
+
+		public void Undo(Document document)
+		{
+			for (var i = actions.Count - 1; i >= 0; i--)
+				actions[i].Undo(document);
+		}
+
+		public void Redo(Document document)
+		{
+			foreach (var action in actions)
+				action.Redo(document);
+		}
+	}
 }

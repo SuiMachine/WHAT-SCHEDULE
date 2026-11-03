@@ -1,8 +1,10 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using SkiaSharp;
 using WhatSchedule.Controls.Dialogs;
+using WhatSchedule.Documents;
 using WhatSchedule.Elements;
 using WhatSchedule.ViewModels;
 
@@ -130,6 +132,43 @@ public partial class MainWindow : Window
 	private async void OnAddLabelClick(object? sender, EventArgs e) => await Canvas.Menus.AddLabelAsync(new SKPoint(0, 0));
 
 	private async void OnAddImageClick(object? sender, EventArgs e) => await Canvas.Menus.AddImageAsync(new SKPoint(0, 0));
+
+	//A Photoshop import replaces the whole project: the file's background layer becomes the document background, its size the document's size, and its layers the only elements.
+	private async void OnImportPsdClick(object? sender, EventArgs e)
+	{
+		if (DataContext is not MainWindowViewModel viewModel)
+			return;
+
+		if (!await ConfirmationDialog.ShowDialog(this, "Import PSD", "Importing a Photoshop document will remove all of the content of the current canvas. The importer doesn't preserve complex effects and layering of PSD files, so it's best to squash them before import when possible. Continue?", "Import"))
+			return;
+
+		var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+		{
+			Title = "Import Photoshop document",
+			AllowMultiple = false,
+			FileTypeFilter = [new FilePickerFileType("Photoshop document") { Patterns = ["*.psd"] }],
+		});
+		if (files.Count != 1)
+			return;
+
+		PsdImportResult import;
+		await using (var stream = await files[0].OpenReadAsync())
+		{
+			try
+			{
+				import = PsdImporter.Import(stream);
+			}
+			catch (Exception error) when (error is InvalidDataException or ArgumentException)
+			{
+				await ConfirmationDialog.ShowMessage(this, "Import PSD", "The Photoshop file could not be imported: " + error.Message);
+				return;
+			}
+		}
+
+		viewModel.Document.PrepareNewWithBackground(import.Background);
+		if (import.Elements.Count > 0)
+			viewModel.Document.AddRangeTracked(import.Elements, "Import PSD");
+	}
 
 	//The clipboard is internal to the canvas; the menu items cover focus it loses to other controls.
 

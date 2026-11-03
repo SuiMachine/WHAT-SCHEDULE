@@ -60,6 +60,24 @@ public sealed class Document
 		History.Push(new ElementCollectionAction(null, element, rootElements.Count - 1, added: true));
 	}
 
+	/// <summary>Adds several elements to the document root in order and records the whole addition as one undo step.</summary>
+	public void AddRangeTracked(IReadOnlyList<CanvasElement> elements, string description)
+	{
+		if (elements.Count == 0)
+			return;
+
+		var index = rootElements.Count;
+		var actions = new List<IHistoryAction>(elements.Count);
+		foreach (var element in elements)
+		{
+			Insert(null, element, rootElements.Count);
+			actions.Add(new ElementCollectionAction(null, element, index, added: true));
+			index++;
+		}
+
+		History.Push(new CompositeAction(description, actions));
+	}
+
 	/// <summary>Removes an element (with everything inside it) and records the removal in the undo history. Returns false when the element is not in the document.</summary>
 	public bool RemoveTracked(CanvasElement element)
 	{

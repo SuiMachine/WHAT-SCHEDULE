@@ -67,6 +67,7 @@
 						<NativeMenuItem Header="New..." Command="{Binding NewScheduleCommand}" Gesture="Ctrl+N" />
 						<NativeMenuItem Header="Load..." Command="{Binding LoadCommand}" Gesture="Ctrl+O" />
 						<NativeMenuItem Header="Save..." Command="{Binding SaveCommand}" Gesture="Ctrl+S" />
+						<NativeMenuItem Header="Import PSD..." Click="OnImportPsdClick" />
 						<NativeMenuItem Header="Export..." Command="{Binding ExportCommand}" Gesture="Ctrl+E" />
 						<NativeMenuItemSeparator />
 						<NativeMenuItem Header="Exit" Click="OnExitClick" />

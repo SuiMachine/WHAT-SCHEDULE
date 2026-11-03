@@ -181,7 +181,7 @@ public partial class MainWindowViewModel : ObservableObject
 
 	private Document CreateSampleDocument()
 	{
-		var document = new Document { Background = CreateSampleBackground() };
+		var document = new Document { Background = LoadExampleInternalAsset("background.png") };
 		document.Add(new LabelElement
 		{
 			Text = OverlayText,
@@ -195,10 +195,9 @@ public partial class MainWindowViewModel : ObservableObject
 		return document;
 	}
 
-	/// <summary>The background of a fresh document: the bundled example image.</summary>
-	private static SKBitmap CreateSampleBackground()
+	private static SKBitmap LoadExampleInternalAsset(string asset)
 	{
-		using var stream = AssetLoader.Open(new Uri("avares://WhatSchedule/Assets/Example/background.png"));
+		using var stream = AssetLoader.Open(new Uri($"avares://WhatSchedule/Assets/Example/{asset}"));
 		return SKBitmap.Decode(stream);
 	}
 }

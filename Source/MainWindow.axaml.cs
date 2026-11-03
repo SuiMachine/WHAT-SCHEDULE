@@ -139,7 +139,7 @@ public partial class MainWindow : Window
 		if (DataContext is not MainWindowViewModel viewModel)
 			return;
 
-		if (!await ConfirmationDialog.ShowDialog(this, "Import PSD", "Importing a Photoshop document will remove all of the content of the current canvas. The importer doesn't preserve complex effects and layering of PSD files, so it's best to squash them before import when possible. Continue?", "Import"))
+		if (!await ConfirmationDialog.ShowDialog(this, "Import PSD", "Importing a Photoshop document will remove all of the content of the current canvas. The importer doesn't preserve complex effects and layering of PSD files, so it's best to squash your layers when possible before import. Continue?", "Import"))
 			return;
 
 		var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions

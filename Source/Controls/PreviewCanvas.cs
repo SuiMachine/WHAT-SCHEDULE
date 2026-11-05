@@ -63,6 +63,12 @@ public class PreviewCanvas : Control, IDisposable
 
 	private IPointerDrag? activeDrag;
 
+	/// <summary>The element nudged with the arrow keys and its state when the nudging began, so a whole key hold records as one undo entry.</summary>
+	private (CanvasElement Element, CanvasElement.ElementState Start)? arrowNudge;
+
+	/// <summary>The arrow keys currently held down; the nudge entry commits when the last one is released.</summary>
+	private readonly HashSet<Key> heldArrowKeys = new();
+
 	/// <summary>The element copied by Ctrl+C or cut, waiting to be pasted.</summary>
 	private CanvasElement? clipboardElement;
 
@@ -94,6 +100,8 @@ public class PreviewCanvas : Control, IDisposable
 			InvalidateVisual();
 			SelectionChanged?.Invoke();
 		};
+		//A nudge still open when the selection changes is laid to rest before it could span two elements.
+		Selection.SelectionChanged += () => CommitArrowNudge();
 		PointerCaptureLost += (_, _) =>
 		{
 			activeDrag = null;
@@ -114,6 +122,30 @@ public class PreviewCanvas : Control, IDisposable
 		{
 			if (Selection.SelectedElement is { } element && document.RemoveTracked(element))
 				e.Handled = true;
+			return;
+		}
+
+		//Arrow keys nudge the selected element by one document pixel per press; holding relies on the keyboard's auto-repeat, which fires this again after its own repeat delay (the "short cooldown").
+		if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
+		{
+			if (Selection.SelectedElement is { } element)
+			{
+				heldArrowKeys.Add(e.Key);
+				arrowNudge ??= (element, element.CaptureState());
+
+				//The move happens in document space, so one arrow pixel is one visual pixel even inside rotated and scaled groups.
+				//Unlike dragging there is no snapping: the nudge is exact even from fractional positions.
+				var delta = e.Key switch
+				{
+					Key.Left => new SKPoint(-1f, 0f),
+					Key.Right => new SKPoint(1f, 0f),
+					Key.Up => new SKPoint(0f, -1f),
+					_ => new SKPoint(0f, 1f),
+				};
+				element.Position = element.DocumentToParent(element.ParentToDocument(element.Position) + delta);
+				document.RaiseChanged();
+				e.Handled = true;
+			}
 			return;
 		}
 
@@ -422,6 +454,29 @@ public class PreviewCanvas : Control, IDisposable
 		}
 
 		Cursor = Cursor.Default;
+	}
+
+	protected override void OnKeyUp(KeyEventArgs e)
+	{
+		base.OnKeyUp(e);
+
+		if (e.Key is not (Key.Left or Key.Right or Key.Up or Key.Down))
+			return;
+
+		heldArrowKeys.Remove(e.Key);
+		if (heldArrowKeys.Count == 0)
+			CommitArrowNudge();
+	}
+
+	/// <summary>Records the open arrow-key nudge as one move in the undo history and closes it; fire it when the last
+	/// arrow is released or when the selection changes mid-nudge, so two elements never share one entry.</summary>
+	private void CommitArrowNudge()
+	{
+		if (arrowNudge is not { } nudge)
+			return;
+
+		arrowNudge = null;
+		Document?.RecordStateChange(nudge.Element, nudge.Start, "Move " + nudge.Element.Kind);
 	}
 
 	private void UpdateHoverCursor(Point position, KeyModifiers modifiers)

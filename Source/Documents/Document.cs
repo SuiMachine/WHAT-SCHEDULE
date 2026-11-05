@@ -93,6 +93,23 @@ public sealed class Document
 	}
 
 	/// <summary>
+	/// Puts <paramref name="replacement"/> in place of <paramref name="element"/> — same container, same layering slot —
+	/// and records the swap in the undo history. Used to swap an element whose whole identity changed (e.g. an image's
+	/// bitmap, which no element state carries) while keeping its box on the canvas.
+	/// </summary>
+	public void ReplaceElementTracked(CanvasElement element, CanvasElement replacement)
+	{
+		var parent = element.Parent;
+		var index = IndexOf(element);
+		if (index < 0)
+			return;
+
+		RemoveFrom(element);
+		Insert(parent, replacement, index);
+		History.Push(new ElementReplacementAction(parent, element, replacement, index, "Replace " + replacement.Kind));
+	}
+
+	/// <summary>
 	/// Moves an element in the layering order of its container and records the move in the undo history.
 	/// A positive <paramref name="offset"/> moves it towards the front (drawn on top); returns false when it cannot move.
 	/// </summary>

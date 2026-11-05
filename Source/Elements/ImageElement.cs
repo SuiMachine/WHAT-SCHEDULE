@@ -15,6 +15,19 @@ namespace WhatSchedule.Elements
 		Bottom,
 	}
 
+	/// <summary>How a bitmap's aspect ratio relates to an image element's box, i.e. which axis is center-cropped when the bitmap is swapped in to fill the box.</summary>
+	internal enum BitmapFit
+	{
+		/// <summary>The bitmap's aspect ratio matches the box; it swaps in uncropped.</summary>
+		Same,
+
+		/// <summary>The bitmap is relatively taller than the box; its top and bottom are cropped away.</summary>
+		Taller,
+
+		/// <summary>The bitmap is relatively wider than the box; its left and right sides are cropped away.</summary>
+		Wider,
+	}
+
 	public sealed class ImageElement : CanvasElement
 	{
 		private static readonly SKPaint BitmapPaint = new()
@@ -257,6 +270,68 @@ namespace WhatSchedule.Elements
 			canvas.RestoreToCount(count);
 		}
 
+		/// <summary>Tolerance within which a bitmap's aspect ratio still counts as matching the box, so a near-match swaps in uncropped instead of cropping fractions of a pixel.</summary>
+		private const float SameAspectTolerance = 0.005f;
+
+		/// <summary>How the whole <paramref name="bitmap"/> relates to this element's box: matching, or taller or wider by aspect ratio, i.e. which axis would be center-cropped to make the bitmap fill the box.</summary>
+		internal BitmapFit MeasureBitmapFit(SKBitmap bitmap)
+		{
+			if (Width <= 0 || Height <= 0)
+				return BitmapFit.Same;
+
+			var boxAspect = Width / Height;
+			var bitmapAspect = bitmap.Height > 0 ? (float)bitmap.Width / bitmap.Height : 1f;
+			if (Math.Abs(bitmapAspect / boxAspect - 1f) <= SameAspectTolerance)
+				return BitmapFit.Same;
+
+			return bitmapAspect < boxAspect ? BitmapFit.Taller : BitmapFit.Wider;
+		}
+
+		/// <summary>The part of <paramref name="bitmap"/> that fills this element's box at its aspect ratio, center-cropping the bitmap's surplus axis; the whole bitmap when the aspect ratios match.</summary>
+		private SKRect FitBoxCrop(SKBitmap bitmap)
+		{
+			var fit = MeasureBitmapFit(bitmap);
+			if (fit == BitmapFit.Same)
+				return new SKRect(0, 0, bitmap.Width, bitmap.Height);
+
+			var boxAspect = Width / Height;
+			if (fit == BitmapFit.Taller)
+			{
+				//The bitmap is relatively taller than the box, so the full width stays and the surplus comes off the top and bottom.
+				var height = (float)bitmap.Width / boxAspect;
+				return SKRect.Create(0, (bitmap.Height - height) / 2f, bitmap.Width, height);
+			}
+
+			//The bitmap is relatively wider than the box, so the full height stays and the surplus comes off the left and right.
+			var width = bitmap.Height * boxAspect;
+			return SKRect.Create((bitmap.Width - width) / 2f, 0, width, bitmap.Height);
+		}
+
+		/// <summary>Creates a replacement element drawing <paramref name="bitmap"/> in this element's exact place: the box, rotation and styling carry over unchanged, and the bitmap fills the box, center-cropping its surplus axis when its aspect ratio does not match the box.</summary>
+		internal ImageElement CreateReplacement(SKBitmap bitmap)
+		{
+			var replacement = new ImageElement(bitmap, Position)
+			{
+				Rotation = Rotation,
+				Width = Width,
+				Height = Height,
+				Opacity = Opacity,
+				CornerRadius = CornerRadius,
+				FlipX = FlipX,
+				FlipY = FlipY,
+				ShadowColor = ShadowColor,
+				ShadowBlur = ShadowBlur,
+				ShadowOffset = ShadowOffset,
+				TintColor = TintColor,
+				TintMode = TintMode,
+				BlendMode = BlendMode,
+				Name = Name,
+			};
+			replacement.Tag = Tag;
+			replacement.Crop = FitBoxCrop(bitmap);
+			return replacement;
+		}
+
 		/// <summary>Creates a copy of the image element sharing the bitmap (which is never modified) and restoring the rest of its state.</summary>
 		public override CanvasElement Clone()
 		{
@@ -312,6 +387,9 @@ namespace WhatSchedule.Elements
 
 		public override void BuildInspectorRows(IInspectorBuilder builder)
 		{
+			builder.AddSection("Image");
+			builder.AddImageReplaceButton();
+
 			builder.AddSection("Size");
 			builder.AddNumber("Width", () => Width, value => Width = (float)Math.Max(ThemeDefinition.MinElementSize, value));
 			builder.AddNumber("Height", () => Height, value => Height = (float)Math.Max(ThemeDefinition.MinElementSize, value));

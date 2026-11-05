@@ -95,6 +95,24 @@ namespace WhatSchedule.Documents
 		}
 	}
 
+	/// <summary>An element swapped for a different one in place, keeping its container and layering slot.</summary>
+	internal sealed class ElementReplacementAction(GroupElement? parent, CanvasElement before, CanvasElement after, int index, string description) : IHistoryAction
+	{
+		public string Description => description;
+
+		public void Undo(Document document)
+		{
+			document.RemoveAt(parent, index);
+			document.Insert(parent, before, index);
+		}
+
+		public void Redo(Document document)
+		{
+			document.RemoveAt(parent, index);
+			document.Insert(parent, after, index);
+		}
+	}
+
 	/// <summary>An element moved within the layering order of its container.</summary>
 	internal sealed class ElementReorderAction(CanvasElement element, int before, int after) : IHistoryAction
 	{

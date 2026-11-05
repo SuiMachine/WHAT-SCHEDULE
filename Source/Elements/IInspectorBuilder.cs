@@ -44,6 +44,10 @@ public interface IInspectorBuilder
 	/// picks to <paramref name="insert"/>, which usually inserts it into a text.</summary>
 	void AddVariablePicker(Action<string> insert);
 
+	/// <summary>Adds a button that replaces the selected image element's bitmap with a picked file, keeping
+	/// the element's box on the canvas and cropping the replacement to fill it when its aspect ratio differs.</summary>
+	void AddImageReplaceButton();
+
 	/// <summary>A combo box of the installed font families, with the element's family preselected.</summary>
 	void AddFontBox(string header, Func<string> getter, Action<string> setter);
 

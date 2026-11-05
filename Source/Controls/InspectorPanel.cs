@@ -100,6 +100,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddSlider(string header, float minimum, float maximum, Func<float> getter, Action<float> setter) => AddSlider(header, minimum, maximum, getter, setter);
 	void IInspectorBuilder.AddColor(string header, Func<SKColor> getter, Action<SKColor> setter) => AddColor(header, getter, setter);
 	void IInspectorBuilder.AddVariablePicker(Action<string> insert) => AddVariablePicker(insert);
+	void IInspectorBuilder.AddImageReplaceButton() => AddImageReplaceButton();
 	void IInspectorBuilder.AddFontBox(string header, Func<string> getter, Action<string> setter) => AddFontBox(header, getter, setter);
 	void IInspectorBuilder.AddSync(Action sync) => syncCallbacks.Add(sync);
 	void IInspectorBuilder.Apply(string description, Action mutation) => Apply(description, mutation);
@@ -665,6 +666,19 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 
 			if (await VariableListDialog.PickVariable(owner, document) is { } name)
 				Apply("Use variable", () => insert(name));
+		};
+
+		AddRow(string.Empty, button);
+	}
+
+	/// <summary>The button that swaps the selected image element's bitmap for a picked file, keeping its box on the canvas; the whole flow lives in the canvas's replace handler.</summary>
+	private void AddImageReplaceButton()
+	{
+		var button = new Button { Content = "Replace Image...", HorizontalAlignment = HorizontalAlignment.Stretch };
+		button.Click += async (_, _) =>
+		{
+			if (element is ImageElement image && canvas is not null)
+				await canvas.Menus.ReplaceImageAsync(image);
 		};
 
 		AddRow(string.Empty, button);

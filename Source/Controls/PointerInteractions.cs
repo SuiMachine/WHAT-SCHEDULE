@@ -65,6 +65,7 @@ internal sealed class ElementMoveDrag : IPointerDrag
 	private readonly Point startPosition;
 	private readonly SKPoint startAnchor;
 	private readonly CanvasElement.ElementState startState;
+	private bool started;
 
 	public ElementMoveDrag(PreviewCanvas canvas, CanvasElement element, Point position)
 	{
@@ -84,6 +85,19 @@ internal sealed class ElementMoveDrag : IPointerDrag
 		var document = canvas.Document;
 		if (document is null)
 			return;
+
+		//Accidental-move protection: while the cursor stays within a small radius of the press point, the
+		//press is a click that only selects; the move starts once the cursor crosses the radius, in control
+		//pixels so the protection is the same at every zoom level.
+		if (!started)
+		{
+			var jitterX = position.X - startPosition.X;
+			var jitterY = position.Y - startPosition.Y;
+			if (jitterX * jitterX + jitterY * jitterY < ThemeDefinition.MoveStartRadius * ThemeDefinition.MoveStartRadius)
+				return;
+
+			started = true;
+		}
 
 		var scale = canvas.Viewport.Scale;
 		var delta = new SKPoint(

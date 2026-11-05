@@ -119,6 +119,8 @@ public static class ThemeDefinition
 	public const double RotateHandleOffset = 20;
 	public const double RotationSnap = 15;
 	public const double GuideHitTolerance = 2;
+	/// <summary>Within this radius around the press point a held left button counts as a click, not a move drag, so an accidental nudge while selecting cannot shift the element.</summary>
+	public const double MoveStartRadius = 3;
 	public const double MinElementSize = 8;
 	public const float MinFontSize = 4;
 }

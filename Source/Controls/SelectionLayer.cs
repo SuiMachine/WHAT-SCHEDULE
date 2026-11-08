@@ -187,7 +187,7 @@ internal sealed class SelectionLayer
 			ctx.LineTo(ToScreen(element.ToDocument(GetCorner(bounds, Corner.BottomLeft)), imageRect, scale));
 			ctx.EndFigure(true);
 		}
-		context.DrawGeometry(null, ThemeDefinition.SelectionPen, box);
+		context.DrawGeometry(null, SelectedElement.IsLocked ? ThemeDefinition.SelectionPenLocked : ThemeDefinition.SelectionPen, box);
 
 		//While Alt is held (or a crop drag runs), the dashed box shows the whole bitmap the crop hides.
 		if (ShowCropBounds && element is ImageElement image)

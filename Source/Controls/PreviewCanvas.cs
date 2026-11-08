@@ -119,8 +119,43 @@ public class PreviewCanvas : Control, IDisposable
 		return false;
 	}
 
+	/// <summary>The completion of an ongoing canvas color sampling, awaiting the click that samples or the Escape that cancels it.</summary>
+	private TaskCompletionSource<SKColor?>? colorSample;
+
 	/// <summary>Raised after the mask editing mode started or ended, so the inspector's mask rows can switch their buttons.</summary>
 	internal event Action? MaskEditChanged;
+
+	/// <summary>
+	/// Waits for the next left click on the canvas and the color it lands on, showing the sampling cursor until
+	/// then; null when the click samples nothing (no document) or Escape cancels the sampling.
+	/// </summary>
+	internal Task<SKColor?> SampleCanvasColor()
+	{
+		if (colorSample is { } pending)
+			return pending.Task;
+
+		if (Document is not { } document || document.Width <= 0 || document.Height <= 0)
+			return Task.FromResult<SKColor?>(null);
+
+		//The sampling owns the pointer alone: a mask edit session still open settles as its own undo entry first.
+		EndMaskEdit();
+		colorSample = new TaskCompletionSource<SKColor?>(TaskCreationOptions.RunContinuationsAsynchronously);
+		Cursor = CanvasCursors.Sample;
+		InvalidateVisual();
+		return colorSample.Task;
+	}
+
+	/// <summary>Ends the color sampling, handing <paramref name="sampled"/> to the awaiting picker; null cancels it.</summary>
+	private void FinishColorSample(SKColor? sampled)
+	{
+		if (colorSample is not { } pending)
+			return;
+
+		colorSample = null;
+		Cursor = Cursor.Default;
+		pending.TrySetResult(sampled);
+		InvalidateVisual();
+	}
 
 	/// <summary>Raised after the element selected on the canvas changed.</summary>
 	internal event Action? SelectionChanged;
@@ -166,6 +201,14 @@ public class PreviewCanvas : Control, IDisposable
 		{
 			if (Selection.SelectedElement is { } element && document.RemoveTracked(element))
 				e.Handled = true;
+			return;
+		}
+
+		//Escape cancels a pending color sample, like the mask editing mode below, which it also ends.
+		if (e.Key == Key.Escape && colorSample is not null)
+		{
+			FinishColorSample(null);
+			e.Handled = true;
 			return;
 		}
 
@@ -379,6 +422,8 @@ public class PreviewCanvas : Control, IDisposable
 			Viewport.ResetFit();
 			Selection.SelectedElement = null;
 			MaskEditGroup = null;
+			//A pending color sample cannot outlive the document it was to sample from.
+			FinishColorSample(null);
 			activeDrag = null;
 			InvalidateVisual();
 		}
@@ -413,6 +458,17 @@ public class PreviewCanvas : Control, IDisposable
 		Focus();
 
 		var point = e.GetCurrentPoint(this);
+
+		//A pending color sample owns the pointer: the next left click samples the pixel under it, and any other click does nothing.
+		if (colorSample is not null)
+		{
+			if (point.Properties.IsLeftButtonPressed && Document is { } samplingDocument)
+				FinishColorSample(Surface.SamplePixel(Viewport.ScreenToDocument(point.Position, GetImageRect(samplingDocument))));
+
+			e.Handled = true;
+			return;
+		}
+
 		if (point.Properties.IsRightButtonPressed)
 		{
 			if (Menus.ShowRulerMenu(point.Position) || Menus.ShowCanvasMenu(point.Position))
@@ -625,6 +681,13 @@ public class PreviewCanvas : Control, IDisposable
 
 	private void UpdateHoverCursor(Point position, KeyModifiers modifiers)
 	{
+		//A pending color sample keeps its cursor everywhere it sweeps.
+		if (colorSample is not null)
+		{
+			Cursor = CanvasCursors.Sample;
+			return;
+		}
+
 		var document = Document;
 		if (document is null || Surface.Bitmap is null)
 		{

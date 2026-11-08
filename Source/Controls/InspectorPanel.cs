@@ -643,13 +643,24 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			if (owner is null)
 				return;
 
+			//The sample request closes the editor and resumes it: with the drawn color after a canvas click,
+			//or with the color it had when the sampling was cancelled. Only OK commits.
 			var current = get();
-			var picked = await ColorPickerDialog.ShowDialog(owner, current);
-			if (picked is not { } value)
-				return;
+			while (true)
+			{
+				var (outcome, picked) = await ColorPickerDialog.ShowDialog(owner, current);
+				if (outcome == ColorPickOutcome.Sample && canvas is not null)
+				{
+					current = await canvas.SampleCanvasColor() ?? current;
+					continue;
+				}
 
-			Apply(header, () => set(picked.Value));
-			Refresh();
+				if (outcome == ColorPickOutcome.Picked)
+					Apply(header, () => set(picked));
+
+				Refresh();
+				return;
+			}
 		};
 		AddRow(header, editor);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });

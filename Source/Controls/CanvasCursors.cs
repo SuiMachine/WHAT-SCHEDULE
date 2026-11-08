@@ -13,6 +13,8 @@ internal static class CanvasCursors
 
 	public static readonly Cursor Move = new(StandardCursorType.SizeAll);
 	public static readonly Cursor Rotate = new(StandardCursorType.Cross);
+	/// <summary>The cursor while a click on the canvas samples its color; a crosshair for the pixel it will pick.</summary>
+	public static readonly Cursor Sample = new(StandardCursorType.Cross);
 	private static readonly Cursor SizeWestEast = new(StandardCursorType.SizeWestEast);
 	private static readonly Cursor SizeNorthSouth = new(StandardCursorType.SizeNorthSouth);
 	public static readonly Cursor HorizontalGuide = new(StandardCursorType.SizeNorthSouth);

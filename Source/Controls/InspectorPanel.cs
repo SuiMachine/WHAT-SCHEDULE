@@ -30,6 +30,12 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	/// <summary>Titles of the sections the user collapsed, kept across rebuilds so the choice sticks when the selection changes.</summary>
 	private readonly HashSet<string> collapsedSections = new(StringComparer.Ordinal);
 
+	public InspectorPanel()
+	{
+		//The mask points open collapsed: their coordinates are fine-tuned by typing far less often than the mask is shaped by dragging.
+		collapsedSections.Add("Mask Points");
+	}
+
 	/// <summary>The editors of the section being built, hidden while its header is collapsed.</summary>
 	private List<Control> sectionControls = new();
 
@@ -429,7 +435,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	/// <summary>A numeric editor with spin buttons. The value is previewed live while it changes and a whole
 	/// edit run (typing, a pointer drag on a spin button, or a run of held keyboard steps) commits as a
 	/// single undo entry when the run ends on Enter or focus loss; input the control cannot parse is discarded.</summary>
-	private void AddNumber(string header, Func<float> get, Action<float> set, float? minimum = null, float? maximum = null)
+	private NumericUpDown NumberEditor(string header, Func<float> get, Action<float> set, float? minimum = null, float? maximum = null)
 	{
 		//The bounds are decimal's own extremes when absent; a float bound always fits inside that range.
 		var box = new NumericUpDown
@@ -437,7 +443,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			FormatString = "0.##",
 			NumberFormat = CultureInfo.InvariantCulture.NumberFormat,
 			Minimum = (decimal?)minimum ?? decimal.MinValue,
-			Maximum = (decimal?)maximum ?? decimal.MaxValue
+			Maximum = (decimal?)maximum ?? decimal.MaxValue,
 		};
 
 		//Value changes that come from the sync refresh must not start an edit or commit anything.
@@ -480,9 +486,12 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		};
 
 		Refresh();
-		AddRow(header, box);
 		syncCallbacks.Add(() => { if (!box.IsKeyboardFocusWithin) Refresh(); });
+		return box;
 	}
+
+	private void AddNumber(string header, Func<float> get, Action<float> set, float? minimum = null, float? maximum = null) =>
+		AddRow(header, NumberEditor(header, get, set, minimum, maximum));
 
 	/// <summary>A switch that commits as soon as it is toggled. Only user clicks raise the switch's
 	/// click event, so the sync refreshes setting its state never record undo states.</summary>
@@ -736,11 +745,62 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		else if (group.Mask is not null)
 		{
 			var remove = new Button { Content = "Remove Mask", HorizontalAlignment = HorizontalAlignment.Stretch };
-			remove.Click += (_, _) => Apply("Remove Group mask", () => group.Mask = null);
+			remove.Click += (_, _) =>
+			{
+				Apply("Remove Group mask", () => group.Mask = null);
+
+				//The point rows below die with the mask, so the panel builds itself anew.
+				Rebuild(canvas?.Selection.SelectedElement);
+			};
 			panel.Children.Add(remove);
 		}
 
 		AddRow(string.Empty, panel);
+
+		//The vertices the mask clips by, one numbered coordinate pair a row, listed only while the mask is
+		//being edited — outside editing they are canvas shapes, not numbers to pore over. Canvas drags push
+		//their values back into the rows, and the group's own undo state carries each edit.
+		if (editing && group.Mask is not null)
+		{
+			AddSection("Mask Points");
+			for (var i = 0; i < group.Mask.Count; i++)
+			{
+				var index = i;
+				var editor = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,*") };
+				void Place(Control child, int column, Thickness margin)
+				{
+					Grid.SetColumn(child, column);
+					child.Margin = margin;
+					editor.Children.Add(child);
+				}
+
+				Place(NumberEditor($"Point {index + 1}",
+					() => ReadMaskPoint(group, index).X,
+					value => WriteMaskPoint(group, index, value, null)), 1, new Thickness(0, 2, 8, 2));
+				Place(NumberEditor($"Point {index + 1}",
+					() => ReadMaskPoint(group, index).Y,
+					value => WriteMaskPoint(group, index, null, value)), 3, new Thickness(0, 2, 0, 2));
+
+				AddRow($"Point {index + 1}", editor);
+			}
+		}
+	}
+
+	/// <summary>The mask's vertex at <paramref name="index"/> — the group's content space the canvas drags it in —
+	/// or the origin when the mask is gone or shorter than that.</summary>
+	private static SKPoint ReadMaskPoint(GroupElement group, int index)
+	{
+		return group.Mask is { } vertices && vertices.Count > index ? vertices[index] : SKPoint.Empty;
+	}
+
+	/// <summary>Writes one coordinate of the mask's vertex at <paramref name="index"/>, keeping the other one; a
+	/// null coordinate keeps the vertex's own value, a missing vertex writes nothing.</summary>
+	private static void WriteMaskPoint(GroupElement group, int index, float? x, float? y)
+	{
+		if (group.Mask is not { } vertices || vertices.Count <= index)
+			return;
+
+		vertices[index] = new SKPoint(x ?? vertices[index].X, y ?? vertices[index].Y);
 	}
 
 	/// <summary>A combo box of the installed font families, with the element's family preselected.</summary>

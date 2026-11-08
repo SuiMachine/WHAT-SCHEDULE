@@ -672,6 +672,8 @@ public class PreviewCanvas : Control, IDisposable
 					{
 						MaskLayer.RemoveVertex(editing, vertex);
 						document.RaiseChanged();
+						//The inspector's point rows follow the vertex count, so they rebuild with one vertex less.
+						MaskEditChanged?.Invoke();
 						InvalidateVisual();
 						return null;
 					}
@@ -683,7 +685,11 @@ public class PreviewCanvas : Control, IDisposable
 					(clickCount >= 2 || modifiers.HasFlag(KeyModifiers.Control)))
 				{
 					var cursor = Viewport.ScreenToDocument(position, imageRect);
-					return new MaskVertexDrag(this, MaskLayer.InsertVertex(editing, maskEdge, editing.ToLocal(cursor)));
+					var inserted = MaskLayer.InsertVertex(editing, maskEdge, editing.ToLocal(cursor));
+
+					//The new vertex grows the point rows the same moment it becomes draggable.
+					MaskEditChanged?.Invoke();
+					return new MaskVertexDrag(this, inserted);
 				}
 
 				var maskCursor = Viewport.ScreenToDocument(position, imageRect);

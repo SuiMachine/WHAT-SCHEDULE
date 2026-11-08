@@ -32,6 +32,18 @@ public static class ThemeDefinition
 		/// <summary>The indent of one hierarchy level, in pixels.</summary>
 		public const double IndentWidth = 12;
 
+		/// <summary>The size of the group rows' expansion chevron, in pixels; the shape spans it.</summary>
+		public const double ChevronSize = 9;
+
+		/// <summary>The chevron of a group row whose children are listed, matching the inspector's section arrows.</summary>
+		public static readonly Geometry ExpandedChevron = Geometry.Parse("M0,2 L4.5,6 L9,2");
+
+		/// <summary>The chevron of a group row whose children are hidden, pointing at the ones it would show.</summary>
+		public static readonly Geometry CollapsedChevron = Geometry.Parse("M2,0 L6,4.5 L2,9");
+
+		/// <summary>The pen of the group rows' expansion chevrons.</summary>
+		public static readonly IPen ChevronPen = new Pen(RulerLabel, 1.5);
+
 		/// <summary>The width of the new group button in the header band, in pixels.</summary>
 		public const double NewGroupButtonWidth = 16;
 

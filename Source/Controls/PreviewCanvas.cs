@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using SkiaSharp;
 using WhatSchedule.Controls.ContextMenus;
 using WhatSchedule.Documents;
@@ -122,6 +123,22 @@ public class PreviewCanvas : Control, IDisposable
 	/// <summary>The completion of an ongoing canvas color sampling, awaiting the click that samples or the Escape that cancels it.</summary>
 	private TaskCompletionSource<SKColor?>? colorSample;
 
+	/// <summary>The rendered pixels frozen when the color sampling began, in the surface's BGRA-premultiplied layout;
+	/// the sampling loupe reads them, since no input but the sampling click can change the document while it runs.</summary>
+	private (byte[] Pixels, int Width, int Height)? samplePixels;
+
+	/// <summary>Where the pointer last stood while the color sampling runs, in control pixels; the loupe follows it.</summary>
+	private Point? samplePosition;
+
+	/// <summary>The magnification of the sampling loupe's pixel grid.</summary>
+	private const int SamplingZoom = 8;
+
+	/// <summary>How many pixels around the cursor the sampling loupe shows, on each side of it.</summary>
+	private const int SamplingRadius = 5;
+
+	/// <summary>How far the sampling loupe floats away from the cursor.</summary>
+	private const double SamplingLoupeOffset = 16;
+
 	/// <summary>Raised after the mask editing mode started or ended, so the inspector's mask rows can switch their buttons.</summary>
 	internal event Action? MaskEditChanged;
 
@@ -139,6 +156,10 @@ public class PreviewCanvas : Control, IDisposable
 
 		//The sampling owns the pointer alone: a mask edit session still open settles as its own undo entry first.
 		EndMaskEdit();
+		//The loupe shows the pixels the click will sample, so they are rendered up to date and then frozen.
+		Surface.Render(document, tagFilter);
+		samplePixels = Surface.SnapshotPixels();
+		samplePosition = null;
 		colorSample = new TaskCompletionSource<SKColor?>(TaskCreationOptions.RunContinuationsAsynchronously);
 		Cursor = CanvasCursors.Sample;
 		InvalidateVisual();
@@ -152,9 +173,73 @@ public class PreviewCanvas : Control, IDisposable
 			return;
 
 		colorSample = null;
+		samplePixels = null;
+		samplePosition = null;
 		Cursor = Cursor.Default;
 		pending.TrySetResult(sampled);
 		InvalidateVisual();
+	}
+
+	/// <summary>The sampling loupe: the frozen pixels around the cursor magnified beside it, the center cell
+	/// boxing the pixel the click will sample.</summary>
+	private void DrawSamplingLoupe(DrawingContext context, Rect imageRect)
+	{
+		if (samplePixels is not { } pixels || samplePosition is not { } position)
+			return;
+
+		//The loupe centers on the pixel the click samples, the one under the cursor.
+		var documentPoint = Viewport.ScreenToDocument(position, imageRect);
+		var centerX = Math.Clamp((int)Math.Round(documentPoint.X), 0, pixels.Width - 1);
+		var centerY = Math.Clamp((int)Math.Round(documentPoint.Y), 0, pixels.Height - 1);
+
+		var size = (SamplingRadius * 2 + 1) * SamplingZoom;
+		var left = position.X + SamplingLoupeOffset;
+		var top = position.Y + SamplingLoupeOffset;
+		//The loupe flips to the other side of the cursor when it runs out of room, so it never falls off the canvas.
+		if (left + size > Bounds.Width - 2)
+			left = position.X - SamplingLoupeOffset - size;
+		if (top + size > Bounds.Height - 2)
+			top = position.Y - SamplingLoupeOffset - size;
+		left = Math.Max(2, left);
+		top = Math.Max(2, top);
+
+		var brushes = new Dictionary<Color, IBrush>();
+		for (var dy = -SamplingRadius; dy <= SamplingRadius; dy++)
+		{
+			for (var dx = -SamplingRadius; dx <= SamplingRadius; dx++)
+			{
+				var color = SampleCell(pixels, centerX + dx, centerY + dy);
+				if (!brushes.TryGetValue(color, out var brush))
+					brushes[color] = brush = new ImmutableSolidColorBrush(color);
+				context.FillRectangle(brush, new Rect(
+					left + (dx + SamplingRadius) * SamplingZoom,
+					top + (dy + SamplingRadius) * SamplingZoom,
+					SamplingZoom, SamplingZoom));
+			}
+		}
+
+		context.DrawRectangle(ThemeDefinition.SelectionPen, new Rect(left, top, size, size));
+		context.DrawRectangle(ThemeDefinition.SelectionPen, new Rect(
+			left + SamplingRadius * SamplingZoom,
+			top + SamplingRadius * SamplingZoom,
+			SamplingZoom, SamplingZoom));
+	}
+
+	/// <summary>The frozen snapshot's pixel at (<paramref name="x"/>, <paramref name="y"/>) as a straight-alpha
+	/// color to brush the loupe's cell with, with coordinates clamped into the snapshot.</summary>
+	private static Color SampleCell((byte[] Pixels, int Width, int Height) pixels, int x, int y)
+	{
+		var px = Math.Clamp(x, 0, pixels.Width - 1);
+		var py = Math.Clamp(y, 0, pixels.Height - 1);
+		var offset = (py * pixels.Width + px) * 4;
+		var alpha = pixels.Pixels[offset + 3];
+		if (alpha == 0)
+			return Color.FromArgb(0, 0, 0, 0);
+
+		return Color.FromArgb(alpha,
+			(byte)Math.Min(byte.MaxValue, pixels.Pixels[offset + 2] * 255 / alpha),
+			(byte)Math.Min(byte.MaxValue, pixels.Pixels[offset + 1] * 255 / alpha),
+			(byte)Math.Min(byte.MaxValue, pixels.Pixels[offset] * 255 / alpha));
 	}
 
 	/// <summary>Raised after the element selected on the canvas changed.</summary>
@@ -611,6 +696,15 @@ public class PreviewCanvas : Control, IDisposable
 		base.OnPointerMoved(e);
 
 		var position = e.GetPosition(this);
+
+		//While a color sampling waits, the pointer sweep only carries the loupe across the canvas.
+		if (colorSample is not null)
+		{
+			samplePosition = position;
+			InvalidateVisual();
+			return;
+		}
+
 		if (activeDrag is null)
 		{
 			var showCrop = Selection.ShowCropBounds;
@@ -759,6 +853,18 @@ public class PreviewCanvas : Control, IDisposable
 		return element.Contains(point) ? element : null;
 	}
 
+	protected override void OnPointerExited(PointerEventArgs e)
+	{
+		base.OnPointerExited(e);
+
+		//The loupe leaves with the pointer, until it comes back to finish the sampling.
+		if (colorSample is not null && samplePosition is not null)
+		{
+			samplePosition = null;
+			InvalidateVisual();
+		}
+	}
+
 	protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
 	{
 		base.OnPointerWheelChanged(e);
@@ -797,5 +903,9 @@ public class PreviewCanvas : Control, IDisposable
 		GuideLayer.Draw(context, ContentRect, imageRect, Viewport.Scale, document);
 		Rulers.Draw(context, bounds, imageRect, new Size(document.Width, document.Height), Viewport.Scale);
 		RulerRenderer.DrawBorders(context, bounds);
+
+		//The loupe rides above everything, next to the cursor it follows.
+		if (colorSample is not null)
+			DrawSamplingLoupe(context, imageRect);
 	}
 }

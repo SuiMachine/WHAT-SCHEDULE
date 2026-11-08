@@ -79,6 +79,32 @@ internal sealed class PreviewSurface : IDisposable
 			byte.MaxValue);
 	}
 
+	/// <summary>A flat copy of the rendered pixels in the surface's BGRA-premultiplied layout, rows tight;
+	/// null when there is no bitmap. Sampling freezes the copy, which the magnifier then reads.</summary>
+	public (byte[] Pixels, int Width, int Height)? SnapshotPixels()
+	{
+		if (bitmap is null)
+			return null;
+
+		using var framebuffer = bitmap.Lock();
+		var width = bitmap.PixelSize.Width;
+		var height = bitmap.PixelSize.Height;
+		var pixels = new byte[width * height * 4];
+		var stride = framebuffer.RowBytes;
+		if (stride == width * 4)
+		{
+			Marshal.Copy(framebuffer.Address, pixels, 0, pixels.Length);
+		}
+		else
+		{
+			//Row padding never belongs to the image, so the copy drops it row by row.
+			for (var y = 0; y < height; y++)
+				Marshal.Copy(framebuffer.Address + y * stride, pixels, y * width * 4, width * 4);
+		}
+
+		return (pixels, width, height);
+	}
+
 	public void Dispose()
 	{
 		bitmap?.Dispose();

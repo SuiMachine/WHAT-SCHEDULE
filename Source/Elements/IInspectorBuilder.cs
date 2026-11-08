@@ -48,6 +48,10 @@ public interface IInspectorBuilder
 	/// the element's box on the canvas and cropping the replacement to fill it when its aspect ratio differs.</summary>
 	void AddImageReplaceButton();
 
+	/// <summary>Adds the group's vector mask editor: a button that enters the canvas's mask editing mode
+	/// (creating a mask covering the group's content when it has none) and turns into the one that leaves it, plus a button that removes the mask.</summary>
+	void AddVectorMaskEditor(GroupElement group);
+
 	/// <summary>A combo box of the installed font families, with the element's family preselected.</summary>
 	void AddFontBox(string header, Func<string> getter, Action<string> setter);
 

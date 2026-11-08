@@ -74,6 +74,8 @@ namespace WhatSchedule.Documents
 					Rotation = group.Rotation,
 					ScaleX = group.ScaleX,
 					ScaleY = group.ScaleY,
+					//The mask is only written when the group carries one, so files saved by older versions load and save unchanged.
+					Mask = group.Mask?.Select(vertex => ToData(vertex)).ToList(),
 					Children = group.Children.Select(ToData).ToList()
 				},
 				LabelElement label => new LabelElement.LabelElementData
@@ -163,6 +165,8 @@ namespace WhatSchedule.Documents
 							ScaleX = group.ScaleX,
 							ScaleY = group.ScaleY
 						};
+						//An empty vertex list would clip nothing forever and save forever, so it loads as no mask at all.
+						restored.Mask = group.Mask is { Count: > 0 } mask ? mask.Select(vertex => ToSKPoint(vertex)).ToList() : null;
 						foreach (var child in group.Children)
 							restored.InsertChild(FromData(child), restored.Children.Count);
 						element = restored;

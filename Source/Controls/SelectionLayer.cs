@@ -203,6 +203,20 @@ internal sealed class SelectionLayer
 			context.DrawGeometry(null, ThemeDefinition.CropBoundsPen, cropBounds);
 		}
 
+		//A dashed loop shows where a selected group's vector mask clips its children.
+		if (element is GroupElement { Mask: { Count: >= 2 } maskVertices })
+		{
+			var maskBounds = new StreamGeometry();
+			using (var ctx = maskBounds.Open())
+			{
+				ctx.BeginFigure(ToScreen(element.ToDocument(maskVertices[0]), imageRect, scale), true);
+				for (var i = 1; i < maskVertices.Count; i++)
+					ctx.LineTo(ToScreen(element.ToDocument(maskVertices[i]), imageRect, scale));
+				ctx.EndFigure(true);
+			}
+			context.DrawGeometry(null, ThemeDefinition.CropBoundsPen, maskBounds);
+		}
+
 		var half = ThemeDefinition.HandleSize / 2;
 		foreach (var corner in AllCorners)
 		{

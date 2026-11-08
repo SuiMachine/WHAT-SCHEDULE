@@ -84,6 +84,44 @@ public class PreviewCanvas : Control, IDisposable
 	/// </summary>
 	internal GroupElement? DrillGroup { get; set; }
 
+	/// <summary>
+	/// The group whose vector mask is being edited, or null when no mask is edited: the mask's rectangle and handles
+	/// draw instead of the selection, and only the mask responds to the pointer — the elements sit still.
+	/// </summary>
+	internal GroupElement? MaskEditGroup { get; private set; }
+
+	/// <summary>The group's state when the mask editing began, recorded as the session's single undo entry when the mode is left and the mask changed.</summary>
+	private GroupElement.GroupElementState? maskEditStart;
+
+	/// <summary>Whether the editing session created the group's mask: the session's undo entry then says add instead of edit.</summary>
+	private bool maskEditCreated;
+
+	/// <summary>
+	/// Whether the group changed since the mask editing began: the snapshot's position, rotation, scales and
+	/// every vertex compared by value, because record equality would compare the vertex arrays by reference.
+	/// </summary>
+	private static bool MaskSessionChanged(GroupElement.GroupElementState before, GroupElement.GroupElementState after)
+	{
+		if (before.Position != after.Position || before.Rotation != after.Rotation ||
+			before.ScaleX != after.ScaleX || before.ScaleY != after.ScaleY)
+			return true;
+
+		if (before.Mask is null || after.Mask is null)
+			return before.Mask is not null || after.Mask is not null;
+
+		if (before.Mask.Length != after.Mask.Length)
+			return true;
+
+		for (var i = 0; i < before.Mask.Length; i++)
+			if (before.Mask[i] != after.Mask[i])
+				return true;
+
+		return false;
+	}
+
+	/// <summary>Raised after the mask editing mode started or ended, so the inspector's mask rows can switch their buttons.</summary>
+	internal event Action? MaskEditChanged;
+
 	/// <summary>Raised after the element selected on the canvas changed.</summary>
 	internal event Action? SelectionChanged;
 
@@ -102,6 +140,12 @@ public class PreviewCanvas : Control, IDisposable
 		};
 		//A nudge still open when the selection changes is laid to rest before it could span two elements.
 		Selection.SelectionChanged += () => CommitArrowNudge();
+		//Selecting something else (or nothing) takes the mask editing mode down with the group.
+		Selection.SelectionChanged += () =>
+		{
+			if (MaskEditGroup is not null && !ReferenceEquals(Selection.SelectedElement, MaskEditGroup))
+				EndMaskEdit();
+		};
 		PointerCaptureLost += (_, _) =>
 		{
 			activeDrag = null;
@@ -122,6 +166,14 @@ public class PreviewCanvas : Control, IDisposable
 		{
 			if (Selection.SelectedElement is { } element && document.RemoveTracked(element))
 				e.Handled = true;
+			return;
+		}
+
+		//Escape leaves the mask editing mode, like the inspector's stop button does.
+		if (e.Key == Key.Escape && MaskEditGroup is not null)
+		{
+			EndMaskEdit();
+			e.Handled = true;
 			return;
 		}
 
@@ -178,6 +230,8 @@ public class PreviewCanvas : Control, IDisposable
 			}
 			else if (e.Key == Key.Z)
 			{
+				//Undo or redo would rewrite the edited group mid-session, so the session settles as its own entry first.
+				EndMaskEdit();
 				//Ctrl+Shift+Z redoes, like Ctrl+Y does.
 				if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
 					document.History.Redo(document);
@@ -187,6 +241,7 @@ public class PreviewCanvas : Control, IDisposable
 			}
 			else if (e.Key == Key.Y)
 			{
+				EndMaskEdit();
 				document.History.Redo(document);
 				e.Handled = true;
 			}
@@ -257,6 +312,58 @@ public class PreviewCanvas : Control, IDisposable
 		return true;
 	}
 
+	/// <summary>
+	/// Enters the group's mask editing mode: a mask covering the group's content is created when it had none,
+	/// and the mask's handles replace the selection on the canvas. Leaving the mode records the session as one undo entry.
+	/// </summary>
+	internal void StartMaskEdit(GroupElement group)
+	{
+		var document = Document;
+		if (document is null || !document.ContainsElement(group) || ReferenceEquals(MaskEditGroup, group))
+			return;
+
+		if (MaskEditGroup is not null)
+			EndMaskEdit();
+
+		MaskEditGroup = group;
+		maskEditStart = group.CaptureState() is GroupElement.GroupElementState start ? start : null;
+		maskEditCreated = group.Mask is null;
+		if (group.Mask is null)
+		{
+			//A new mask starts as a rectangle covering everything, so entering the mode alone never hides anything;
+			//the corners are its first four vertices, and the edges are then free to grow new ones.
+			var content = group.ContentBounds;
+			if (content.Width <= 0 || content.Height <= 0)
+				content = SKRect.Create(0, 0, 100, 100);
+			group.Mask =
+			[
+				new SKPoint(content.Left, content.Top),
+				new SKPoint(content.Right, content.Top),
+				new SKPoint(content.Right, content.Bottom),
+				new SKPoint(content.Left, content.Bottom),
+			];
+			document.RaiseChanged();
+		}
+
+		MaskEditChanged?.Invoke();
+		InvalidateVisual();
+	}
+
+	/// <summary>Leaves the mask editing mode, recording the whole session as one undo entry when the group changed during it.</summary>
+	internal void EndMaskEdit()
+	{
+		if (MaskEditGroup is not { } group)
+			return;
+
+		MaskEditGroup = null;
+		if (Document is { } document && maskEditStart is { } before &&
+			group.CaptureState() is GroupElement.GroupElementState after && MaskSessionChanged(before, after))
+			document.RecordStateChange(group, before, (maskEditCreated ? "Add " : "Edit ") + group.Kind + " mask");
+
+		MaskEditChanged?.Invoke();
+		InvalidateVisual();
+	}
+
 	protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
 	{
 		base.OnPropertyChanged(change);
@@ -271,6 +378,7 @@ public class PreviewCanvas : Control, IDisposable
 			Surface.Dispose();
 			Viewport.ResetFit();
 			Selection.SelectedElement = null;
+			MaskEditGroup = null;
 			activeDrag = null;
 			InvalidateVisual();
 		}
@@ -281,6 +389,8 @@ public class PreviewCanvas : Control, IDisposable
 		Selection.SyncWithDocument(Document);
 		if (DrillGroup is not null && Document is { } document && !document.ContainsElement(DrillGroup))
 			DrillGroup = null;
+		if (MaskEditGroup is not null && Document is { } document2 && !document2.ContainsElement(MaskEditGroup))
+			EndMaskEdit();
 		Surface.MarkDirty();
 		InvalidateVisual();
 		DocumentChanged?.Invoke();
@@ -330,14 +440,48 @@ public class PreviewCanvas : Control, IDisposable
 		e.Handled = true;
 	}
 
-	/// <summary>Runs the hit-test chain and returns the drag interaction it starts, falling back to panning.</summary>
-	private IPointerDrag BeginDrag(Point position, KeyModifiers modifiers, int clickCount)
+	/// <summary>Runs the hit-test chain and returns the drag interaction it starts, falling back to panning;
+	/// null when the press is fully handled already, e.g. a double-click that removes a mask vertex.</summary>
+	private IPointerDrag? BeginDrag(Point position, KeyModifiers modifiers, int clickCount)
 	{
 		var document = Document!;
 		var imageRect = GetImageRect(document);
 
 		if (Surface.Bitmap is not null)
 		{
+			//While a mask is being edited, only the mask responds: vertices drag, a double-click or a Ctrl+click
+			//on an edge grows a new vertex there, Ctrl+click on a vertex drops it (keeping at least a triangle,
+			//since fewer than three vertices would clip nothing), the interior moves the whole polygon, and
+			//everything else pans — the elements underneath sit still.
+			if (MaskEditGroup is { } editing)
+			{
+				if (MaskLayer.HitTestVertex(position, editing, imageRect, Viewport.Scale) is { } vertex)
+				{
+					if (modifiers.HasFlag(KeyModifiers.Control) && editing.Mask is { Count: > 3 } vertices)
+					{
+						MaskLayer.RemoveVertex(editing, vertex);
+						document.RaiseChanged();
+						InvalidateVisual();
+						return null;
+					}
+
+					return new MaskVertexDrag(this, vertex);
+				}
+
+				if (MaskLayer.HitTestEdge(position, editing, imageRect, Viewport.Scale) is { } maskEdge &&
+					(clickCount >= 2 || modifiers.HasFlag(KeyModifiers.Control)))
+				{
+					var cursor = Viewport.ScreenToDocument(position, imageRect);
+					return new MaskVertexDrag(this, MaskLayer.InsertVertex(editing, maskEdge, editing.ToLocal(cursor)));
+				}
+
+				var maskCursor = Viewport.ScreenToDocument(position, imageRect);
+				if (MaskLayer.HitTestInside(maskCursor, editing))
+					return new MaskMoveDrag(this, editing, maskCursor);
+
+				return new PanDrag(this, position);
+			}
+
 			if (Selection.SelectedElement is not null && Selection.HitTestRotateHandle(position, imageRect, Viewport.Scale))
 				return new ElementRotateDrag(this, position);
 
@@ -489,6 +633,20 @@ public class PreviewCanvas : Control, IDisposable
 		}
 
 		var imageRect = GetImageRect(document);
+
+		//While a mask is being edited, the hover cursor follows the mask alone.
+		if (MaskEditGroup is { } editing)
+		{
+			if (MaskLayer.HitTestVertex(position, editing, imageRect, Viewport.Scale) is not null ||
+				MaskLayer.HitTestEdge(position, editing, imageRect, Viewport.Scale) is not null ||
+				MaskLayer.HitTestInside(Viewport.ScreenToDocument(position, imageRect), editing))
+				Cursor = CanvasCursors.Move;
+			else
+				Cursor = Cursor.Default;
+
+			return;
+		}
+
 		if (Selection.SelectedElement is not null && Selection.HitTestRotateHandle(position, imageRect, Viewport.Scale))
 			Cursor = CanvasCursors.Rotate;
 		else if (Selection.SelectedElement is not null && Selection.HitTestHandle(position, imageRect, Viewport.Scale) is { } corner)
@@ -569,7 +727,10 @@ public class PreviewCanvas : Control, IDisposable
 
 		var imageRect = GetImageRect(document);
 		context.DrawImage(Surface.Bitmap!, imageRect);
-		Selection.Draw(context, imageRect, Viewport.Scale);
+		if (MaskEditGroup is { } editing)
+			MaskLayer.Draw(context, editing, imageRect, Viewport.Scale);
+		else
+			Selection.Draw(context, imageRect, Viewport.Scale);
 		GuideLayer.Draw(context, ContentRect, imageRect, Viewport.Scale, document);
 		Rulers.Draw(context, bounds, imageRect, new Size(document.Width, document.Height), Viewport.Scale);
 		RulerRenderer.DrawBorders(context, bounds);

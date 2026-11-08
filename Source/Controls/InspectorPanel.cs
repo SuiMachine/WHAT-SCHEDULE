@@ -48,6 +48,8 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		canvas = owner;
 		canvas.SelectionChanged += () => Rebuild(canvas.Selection.SelectedElement);
 		canvas.DocumentChanged += Sync;
+		//Entering and leaving the mask editing mode swaps the mask rows' buttons, so the panel rebuilds for those too.
+		canvas.MaskEditChanged += () => Rebuild(canvas.Selection.SelectedElement);
 		Rebuild(canvas.Selection.SelectedElement);
 	}
 
@@ -101,6 +103,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	void IInspectorBuilder.AddColor(string header, Func<SKColor> getter, Action<SKColor> setter) => AddColor(header, getter, setter);
 	void IInspectorBuilder.AddVariablePicker(Action<string> insert) => AddVariablePicker(insert);
 	void IInspectorBuilder.AddImageReplaceButton() => AddImageReplaceButton();
+	void IInspectorBuilder.AddVectorMaskEditor(GroupElement group) => AddVectorMaskEditor(group);
 	void IInspectorBuilder.AddFontBox(string header, Func<string> getter, Action<string> setter) => AddFontBox(header, getter, setter);
 	void IInspectorBuilder.AddSync(Action sync) => syncCallbacks.Add(sync);
 	void IInspectorBuilder.Apply(string description, Action mutation) => Apply(description, mutation);
@@ -682,6 +685,51 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 		};
 
 		AddRow(string.Empty, button);
+	}
+
+	/// <summary>The selected group's vector mask: a button that starts editing the mask on the canvas (creating one that
+	/// covers the content when the group has none) and becomes the button that stops editing. While editing, a hint names
+	/// the gestures; otherwise a button removes the mask.</summary>
+	private void AddVectorMaskEditor(GroupElement group)
+	{
+		var editing = canvas?.MaskEditGroup is not null && ReferenceEquals(canvas.MaskEditGroup, group);
+		var panel = new StackPanel { Spacing = 4 };
+
+		var edit = new Button
+		{
+			Content = editing ? "Stop Editing Mask" : group.Mask is null ? "Add Vector Mask" : "Edit Vector Mask",
+			HorizontalAlignment = HorizontalAlignment.Stretch,
+		};
+		edit.Click += (_, _) =>
+		{
+			if (canvas is null)
+				return;
+
+			if (ReferenceEquals(canvas.MaskEditGroup, group))
+				canvas.EndMaskEdit();
+			else
+				canvas.StartMaskEdit(group);
+		};
+		panel.Children.Add(edit);
+
+		if (editing)
+		{
+			panel.Children.Add(new TextBlock
+			{
+				Text = "Drag the vertices to shape the mask, drag inside to move it, double-click or Ctrl+click an edge to add a vertex, Ctrl+click a vertex to remove it.",
+				TextWrapping = TextWrapping.Wrap,
+				Foreground = ThemeDefinition.RulerTick,
+				FontSize = 11,
+			});
+		}
+		else if (group.Mask is not null)
+		{
+			var remove = new Button { Content = "Remove Mask", HorizontalAlignment = HorizontalAlignment.Stretch };
+			remove.Click += (_, _) => Apply("Remove Group mask", () => group.Mask = null);
+			panel.Children.Add(remove);
+		}
+
+		AddRow(string.Empty, panel);
 	}
 
 	/// <summary>A combo box of the installed font families, with the element's family preselected.</summary>

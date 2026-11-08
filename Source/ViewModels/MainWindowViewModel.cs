@@ -207,7 +207,8 @@ public partial class MainWindowViewModel : ObservableObject
 		document.Add(new ImageElement(LoadExampleInternalAsset("background_outline.png"), new SKPoint() { X = 0, Y = 0 })
 		{
 			Name = "Background outline",
-			BlendMode = SKBlendMode.Difference
+			BlendMode = SKBlendMode.Difference,
+			IsLocked = true
 		});
 		document.AddGuide(new Guide() { IsHorizontal = true, Position = 145 });
 		document.AddGuide(new Guide() { IsHorizontal = true, Position = 540 });
@@ -220,9 +221,10 @@ public partial class MainWindowViewModel : ObservableObject
 		var artSection = new GroupElement()
 		{
 			Document = document,
-			Name = "Art section"
+			Name = "Art section",
+			IsLocked = true
 		};
-		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_outline.png"), new SKPoint() { X = -314, Y = -462 }), 0);
+		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_outline.png"), new SKPoint() { X = -314, Y = -462 }) { IsLocked = true }, 0);
 		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_temporary.png"), new SKPoint() { X = -289, Y = -445 }) { Name = "User art" }, 0);
 		artSection.Position = new SKPoint(386, 540);
 		document.Add(artSection);

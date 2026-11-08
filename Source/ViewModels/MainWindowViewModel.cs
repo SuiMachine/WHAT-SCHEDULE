@@ -224,9 +224,35 @@ public partial class MainWindowViewModel : ObservableObject
 			Name = "Art section",
 			IsLocked = true
 		};
-		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_outline.png"), new SKPoint() { X = -314, Y = -462 }) { IsLocked = true }, 0);
-		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_temporary.png"), new SKPoint() { X = -289, Y = -445 }) { Name = "User art" }, 0);
-		artSection.Position = new SKPoint(386, 540);
+		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_outline.png"), new SKPoint() { X = -278, Y = -423 }) { IsLocked = true }, 0);
+		artSection.Position = new SKPoint(350, 501);
+
+		var userArtCrop = new GroupElement()
+		{
+			Document = document,
+			Name = "User art crop",
+			IsLocked = true,
+			Mask = new List<SKPoint>()
+			{
+				new SKPoint(-297, -431), //left upper corner
+				new SKPoint(-216, -431),
+				new SKPoint(-194, -454),
+				new SKPoint(194, -454),
+				new SKPoint(216, -431),
+				new SKPoint(297, -431),
+
+				//Mirror through Y
+				new SKPoint(297, 431),
+				new SKPoint(216, 431),
+				new SKPoint(194, 454),
+				new SKPoint(-194, 454),
+				new SKPoint(-216, 431),
+				new SKPoint(-297, 431)
+			}
+		};
+		userArtCrop.InsertChild(new ImageElement(LoadExampleInternalAsset("art_temporary.png"), new SKPoint() { X = -288, Y = -445 }) { Name = "User art" }, 0);
+		userArtCrop.Position = new SKPoint(36, 36);
+		artSection.InsertChild(userArtCrop, 0);
 		document.Add(artSection);
 
 		//But I got a bit clever here
@@ -247,7 +273,7 @@ public partial class MainWindowViewModel : ObservableObject
 			var dayGroup = new GroupElement()
 			{
 				Document = document,
-				Name = dayOfTheWeek.ToString()
+				Name = dayOfTheWeek.ToString(),
 			};
 
 			dayGroup.InsertChild(new ImageElement(dayOfWeekBackgroundOutline, new SKPoint(-542, -59)) { Name = "Outline" }, 0);
@@ -315,6 +341,7 @@ public partial class MainWindowViewModel : ObservableObject
 			int dayOfWeekPosition = counter % 2 == 0 ? startPositionX : startPositionX + shuffleX;
 			dayGroup.Position = new SKPoint(dayOfWeekPosition, startPositionY);
 			document.Add(dayGroup);
+
 			startPositionY += stepY;
 			counter++;
 		}

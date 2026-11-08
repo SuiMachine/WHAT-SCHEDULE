@@ -185,6 +185,25 @@ public partial class MainWindowViewModel : ObservableObject
 		//because I wrote the rules that no assets can be read directly by AI
 		//- Sui
 		var document = new Document { Background = LoadExampleInternalAsset("background.png") };
+		document.Week.DateCulture = ScheduleDateCulture.EnUs;
+
+		//Might not work on Linux? We'll see.
+		(string Suffix, string Zone)[] defaultConversions =
+		[
+			("UTC", "UTC"),
+			("KST", "Asia/Seoul"),
+			("JST", "Asia/Tokyo"),
+			("WIB", "Asia/Jakarta"),
+			("MSK", "Europe/Moscow"),
+			("CET", "Europe/Berlin"),
+			("GMT", "Europe/London"),
+			("ET", "America/New_York"),
+			("CT", "America/Chicago"),
+			("PT", "America/Los_Angeles"),
+		];
+		foreach (var (suffix, zone) in defaultConversions)
+			document.Week.Conversions.Add(new ScheduleZoneConversion { Suffix = suffix, TimeZoneId = zone });
+
 		document.Add(new ImageElement(LoadExampleInternalAsset("background_outline.png"), new SKPoint() { X = 0, Y = 0 })
 		{
 			Name = "Background outline",

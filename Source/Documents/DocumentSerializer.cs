@@ -47,6 +47,12 @@ namespace WhatSchedule.Documents
 			Background = EncodePng(document.Background),
 			Guides = new List<Guide>(document.Guides),
 			Elements = document.RootElements.Select(ToData).ToList(),
+
+			//The week and the custom variables complete the picture: without them every label referencing
+			//the schedule's variables would render empty once the file loads back.
+			Week = ToData(document.Week),
+			//Nothing is written when the document defines none, so old files keep their small shape.
+			Variables = document.Variables.Count > 0 ? new Dictionary<string, string>(document.Variables) : null,
 		};
 
 		private static Document FromData(DocumentData data)
@@ -58,10 +64,81 @@ namespace WhatSchedule.Documents
 			var document = new Document { Background = background };
 			foreach (var guide in data.Guides)
 				document.AddGuide(guide);
+
+			//Files saved before the week was stored keep their freshly initialized week, untouched.
+			FromData(document.Week, data.Week);
+			if (data.Variables is { } variables)
+			{
+				foreach (var pair in variables)
+					document.Variables[pair.Key] = pair.Value;
+			}
+
 			foreach (var element in data.Elements)
 				document.Add(FromData(element));
 			return document;
 		}
+
+		/// <summary>The week's JSON shape: fields absent (saved by an older version) keep the week's in-memory default.</summary>
+		private static WeekData ToData(ScheduleWeek week) => new()
+		{
+			WeekStart = week.WeekStart?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+			TimeFormat = week.TimeFormat.ToString(),
+			DateCulture = week.DateCulture.ToString(),
+			TimeZoneId = week.TimeZoneId,
+			Conversions = [.. week.Conversions.Select(ToData)],
+			Days = [.. week.Days.Select(ToData)],
+		};
+
+		private static ConversionData ToData(ScheduleZoneConversion conversion) => new()
+		{
+			Suffix = conversion.Suffix,
+			TimeZoneId = conversion.TimeZoneId,
+		};
+
+		private static DayEntryData ToData(ScheduleDayEntry entry) => new()
+		{
+			StreamTitle = entry.StreamTitle,
+			//Streaming is the exception, not the rule: days that do not stream stay unwritten.
+			IsStreaming = entry.IsStreaming ? true : null,
+			StreamTime = entry.StreamTime is { } time ? time.ToString("HH:mm", CultureInfo.InvariantCulture) : null,
+		};
+
+		/// <summary>Restores whatever of the week the file carries onto <paramref name="week"/>; the file's nulls
+		/// (fields saved by an older version omitted) leave the corresponding week setting at its default.</summary>
+		private static void FromData(ScheduleWeek week, WeekData? data)
+		{
+			if (data is null)
+				return;
+
+			if (data.WeekStart is { } startText && DateOnly.TryParseExact(startText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
+				week.WeekStart = start;
+			if (Enum.TryParse(data.TimeFormat, out ScheduleTimeFormat timeFormat))
+				week.TimeFormat = timeFormat;
+			if (Enum.TryParse(data.DateCulture, out ScheduleDateCulture dateCulture))
+				week.DateCulture = dateCulture;
+			if (data.TimeZoneId is { } zone)
+				week.TimeZoneId = zone;
+
+			week.Conversions = [.. data.Conversions?.Select(FromData) ?? []];
+			if (data.Days is { } days)
+			{
+				//The week holds one entry per day; a file holding fewer or more leaves the rest at their defaults.
+				for (var i = 0; i < week.Days.Length && i < days.Count; i++)
+				{
+					if (days[i].StreamTitle is { } title)
+						week.Days[i].StreamTitle = title;
+					week.Days[i].IsStreaming = days[i].IsStreaming == true;
+					if (days[i].StreamTime is { } timeText && TimeOnly.TryParseExact(timeText, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+						week.Days[i].StreamTime = time;
+				}
+			}
+		}
+
+		private static ScheduleZoneConversion FromData(ConversionData data) => new()
+		{
+			Suffix = data.Suffix ?? string.Empty,
+			TimeZoneId = data.TimeZoneId,
+		};
 
 		private static CanvasElement.ElementData ToData(CanvasElement element)
 		{
@@ -339,5 +416,57 @@ namespace WhatSchedule.Documents
 		public List<Guide> Guides { get; set; } = new();
 
 		public List<CanvasElement.ElementData> Elements { get; set; } = new();
+
+		/// <summary>The week the schedule covers and displays its dates and times by; null in files saved before the week was stored.</summary>
+		public WeekData? Week { get; set; }
+
+		/// <summary>The document's custom variables by the names the labels reference them with; null when the document defines none.</summary>
+		public Dictionary<string, string>? Variables { get; set; }
+	}
+
+	/// <summary>JSON shape of the schedule's week: the settings its variables display by, the zone conversions
+	/// it offers and its seven day entries. Fields are nullable so files saved by older versions load unchanged.</summary>
+	public sealed class WeekData
+	{
+		/// <summary>The Monday the week starts on, as yyyy-MM-dd; null keeps the current week the fresh week starts with.</summary>
+		public string? WeekStart { get; set; }
+
+		/// <summary>The format the stream start times display by, "Hour24" or "Hour12"; null keeps the default 24-hour one.</summary>
+		public string? TimeFormat { get; set; }
+
+		/// <summary>The culture the dates display by, "Local" or "EnUs"; null keeps the system's culture.</summary>
+		public string? DateCulture { get; set; }
+
+		/// <summary>The zone the stream start times belong to, as a portable (IANA) ID; null means the system's local zone.</summary>
+		public string? TimeZoneId { get; set; }
+
+		/// <summary>The named conversions of the stream start times into other time zones.</summary>
+		public List<ConversionData>? Conversions { get; set; }
+
+		/// <summary>The week's day entries, Monday first.</summary>
+		public List<DayEntryData>? Days { get; set; }
+	}
+
+	/// <summary>JSON shape of one of the week's named zone conversions.</summary>
+	public sealed class ConversionData
+	{
+		/// <summary>The suffix the conversion's variable names carry, e.g. "ET" in "Monday_Time_ET".</summary>
+		public string? Suffix { get; set; }
+
+		/// <summary>The zone the times convert into, as a portable (IANA) ID; null converts into the system's local zone.</summary>
+		public string? TimeZoneId { get; set; }
+	}
+
+	/// <summary>JSON shape of the stream plan for one day of the week.</summary>
+	public sealed class DayEntryData
+	{
+		/// <summary>The day's stream title; null keeps the day's default placeholder title.</summary>
+		public string? StreamTitle { get; set; }
+
+		/// <summary>Whether the streamer streams that day; null (or false) means the day has no stream.</summary>
+		public bool? IsStreaming { get; set; }
+
+		/// <summary>The day's stream start time as HH:mm; null keeps the default of 17:30.</summary>
+		public string? StreamTime { get; set; }
 	}
 }

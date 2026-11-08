@@ -1,9 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Platform.Storage;
 using SkiaSharp;
+using System.Linq;
 using WhatSchedule.Controls.ContextMenus;
 using WhatSchedule.Documents;
 using WhatSchedule.Elements;
@@ -252,6 +255,11 @@ public class PreviewCanvas : Control, IDisposable
 	{
 		Focusable = true;
 		Menus = new CanvasMenus(this);
+
+		//Image files dragged from elsewhere land as image elements at the pixel they are dropped on.
+		DragDrop.SetAllowDrop(this, true);
+		AddHandler(DragDrop.DragOverEvent, OnDragOver, RoutingStrategies.Bubble);
+		AddHandler(DragDrop.DropEvent, OnFileDrop, RoutingStrategies.Bubble);
 
 		Selection.SelectionChanged += () =>
 		{
@@ -534,6 +542,67 @@ public class PreviewCanvas : Control, IDisposable
 
 		Surface.Dispose();
 		GC.SuppressFinalize(this);
+	}
+
+	/// <summary>Accepts a drag hovering over the canvas while it drags files; the copy effect tells the source the drop will use them.</summary>
+	private void OnDragOver(object? sender, DragEventArgs e)
+	{
+		e.DragEffects = e.DataTransfer.Formats.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
+		e.Handled = true;
+	}
+
+	/// <summary>
+	/// Drops the image files dragged onto the canvas: each becomes an image element at the document pixel it landed
+	/// on, every next file one step away so a batch does not stack into one invisible pile; the last one selects.
+	/// A file that is no image or cannot be read is skipped, so one bad file does not stop the rest.
+	/// </summary>
+	private async void OnFileDrop(object? sender, DragEventArgs e)
+	{
+		e.Handled = true;
+		var document = Document;
+		if (document is null || document.Width <= 0 || document.Height <= 0)
+			return;
+
+		//The dragged items are read before the first await, so the drag's payload cannot be disposed mid-loop.
+		var files = new List<IStorageFile>();
+		foreach (var item in e.DataTransfer.Items)
+		{
+			if (item.TryGetFile() is IStorageFile file)
+				files.Add(file);
+		}
+
+		var position = Viewport.ScreenToDocument(e.GetPosition(this), GetImageRect(document));
+		ImageElement? last = null;
+		var step = 0;
+		foreach (var file in files)
+		{
+			SKBitmap? bitmap;
+			try
+			{
+				await using var stream = await file.OpenReadAsync();
+				bitmap = SKBitmap.Decode(stream);
+			}
+			catch
+			{
+				continue;
+			}
+
+			if (bitmap is null)
+				continue;
+
+			//The file's own name names the element, so a dropped batch does not show as a wall of "Image".
+			var image = new ImageElement(bitmap, position + new SKPoint(PasteStep * step, PasteStep * step)) { Name = file.Name };
+			document.AddTracked(image);
+			last = image;
+			step++;
+		}
+
+		if (last is not null)
+		{
+			Selection.SelectedElement = last;
+			Focus();
+			InvalidateVisual();
+		}
 	}
 
 	protected override void OnPointerPressed(PointerPressedEventArgs e)

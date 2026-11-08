@@ -50,7 +50,8 @@ internal sealed class SelectionLayer
 	public Corner? HitTestHandle(Point position, Rect imageRect, double scale)
 	{
 		var element = SelectedElement;
-		if (element is null)
+		//A locked element offers no handles, because none of them can be dragged.
+		if (element is null || element.IsLocked)
 			return null;
 
 		var bounds = element.ContentBounds;
@@ -69,7 +70,7 @@ internal sealed class SelectionLayer
 	public bool HitTestRotateHandle(Point position, Rect imageRect, double scale)
 	{
 		var element = SelectedElement;
-		if (element is null)
+		if (element is null || element.IsLocked)
 			return false;
 
 		var screen = ToScreen(GetRotateHandle(element, scale), imageRect, scale);
@@ -80,7 +81,8 @@ internal sealed class SelectionLayer
 	/// <summary>The selection box edge <paramref name="position"/> is over, within the handle hit radius; only image elements have a crop to drag.</summary>
 	public Edge? HitTestEdge(Point position, Rect imageRect, double scale)
 	{
-		if (SelectedElement is not ImageElement)
+		//Locking an image hides its crop handles along with the rest, since none can be dragged.
+		if (SelectedElement is not ImageElement image || image.IsLocked)
 			return null;
 
 		var bounds = SelectedElement.Bounds;
@@ -216,6 +218,10 @@ internal sealed class SelectionLayer
 			}
 			context.DrawGeometry(null, ThemeDefinition.CropBoundsPen, maskBounds);
 		}
+
+		//A locked element shows its box, but none of its handles: nothing can be dragged from them, so none is offered.
+		if (element.IsLocked)
+			return;
 
 		var half = ThemeDefinition.HandleSize / 2;
 		foreach (var corner in AllCorners)

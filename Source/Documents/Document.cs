@@ -233,6 +233,18 @@ public sealed class Document
 		RaiseChanged();
 	}
 
+	/// <summary>Sets <paramref name="element"/>'s lock and records the change in the undo history; a locked element
+	/// refuses to be moved, scaled, rotated or cropped directly on the canvas.</summary>
+	public void SetLockTracked(CanvasElement element, bool locked)
+	{
+		if (element.IsLocked == locked)
+			return;
+
+		element.IsLocked = locked;
+		History.Push(new ElementLockAction(element, !locked, locked));
+		RaiseChanged();
+	}
+
 	/// <summary>Records an element state change in the undo history, skipping it when the state did not actually change.</summary>
 	public void RecordStateChange(CanvasElement element, CanvasElement.ElementState before, string description)
 	{

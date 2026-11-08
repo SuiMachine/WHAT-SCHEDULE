@@ -18,6 +18,7 @@ internal sealed class CanvasMenus
 	private readonly MenuItem bringForwardItem;
 	private readonly MenuItem sendBackwardItem;
 	private readonly MenuItem replaceImageItem;
+	private readonly MenuItem lockItem;
 	private SKPoint contextMenuPosition;
 
 	public CanvasMenus(PreviewCanvas canvas)
@@ -35,6 +36,13 @@ internal sealed class CanvasMenus
 		{
 			if (canvas.Selection.SelectedElement is ImageElement image)
 				await ReplaceImageAsync(image);
+		};
+
+		lockItem = new MenuItem { Header = "Lock", ToggleType = MenuItemToggleType.CheckBox };
+		lockItem.Click += (_, _) =>
+		{
+			if (canvas.Selection.SelectedElement is { } element && canvas.Document is { } document)
+				document.SetLockTracked(element, !element.IsLocked);
 		};
 
 		rulerMenu = BuildRulerMenu();
@@ -91,6 +99,10 @@ internal sealed class CanvasMenus
 		bringForwardItem.IsEnabled = index >= 0 && index < elements!.Count - 1;
 		sendBackwardItem.IsEnabled = index > 0;
 		replaceImageItem.IsVisible = selected is ImageElement;
+
+		//The lock acts on the selected element, so it is checked to it and disabled without one.
+		lockItem.IsChecked = selected is { IsLocked: true };
+		lockItem.IsEnabled = selected is not null;
 	}
 
 	private void Open(ContextMenu menu)
@@ -145,6 +157,8 @@ internal sealed class CanvasMenus
 		menu.Items.Add(new Separator());
 		menu.Items.Add(bringForwardItem);
 		menu.Items.Add(sendBackwardItem);
+		menu.Items.Add(new Separator());
+		menu.Items.Add(lockItem);
 		return menu;
 	}
 

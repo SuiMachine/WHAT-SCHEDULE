@@ -308,7 +308,8 @@ public class PreviewCanvas : Control, IDisposable
 		//Arrow keys nudge the selected element by one document pixel per press; holding relies on the keyboard's auto-repeat, which fires this again after its own repeat delay (the "short cooldown").
 		if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
 		{
-			if (Selection.SelectedElement is { } element)
+			//A locked element stays where it is; the lock protects it even from the keyboard.
+			if (Selection.SelectedElement is { } element && !element.IsLocked)
 			{
 				heldArrowKeys.Add(e.Key);
 				arrowNudge ??= (element, element.CaptureState());
@@ -642,7 +643,10 @@ public class PreviewCanvas : Control, IDisposable
 			{
 				var target = ResolveSelection(hit, clickCount >= 2);
 				Selection.SelectedElement = target;
-				return new ElementMoveDrag(this, target, position);
+
+				//A locked element selects — its inspector can still be edited — but it does not follow
+				//the pointer: pressing it pans the view instead. Unlock it in the hierarchy's row menu.
+				return target.IsLocked ? new PanDrag(this, position) : new ElementMoveDrag(this, target, position);
 			}
 		}
 
@@ -813,7 +817,7 @@ public class PreviewCanvas : Control, IDisposable
 			Cursor = CanvasCursors.ForEdge(edge);
 		else if (GuideLayer.HitTest(position, document, imageRect, Viewport.Scale) is { } guide)
 			Cursor = guide.IsHorizontal ? CanvasCursors.HorizontalGuide : CanvasCursors.VerticalGuide;
-		else if (HitTestElement(position) is not null)
+		else if (HitTestElement(position) is { } hit && !hit.IsLocked)
 			Cursor = CanvasCursors.Move;
 		else
 			Cursor = Cursor.Default;

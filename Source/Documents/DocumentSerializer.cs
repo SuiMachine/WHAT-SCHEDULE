@@ -225,6 +225,10 @@ namespace WhatSchedule.Documents
 			if (element.Tag is { } tag)
 				data.Tags = [tag.SaveName];
 
+			//The lock is only written when the element carries it, so files saved before locks existed load and save unchanged.
+			if (element.IsLocked)
+				data.IsLocked = true;
+
 			return data;
 		}
 
@@ -323,6 +327,8 @@ namespace WhatSchedule.Documents
 
 			element.Rotation = data.Rotation;
 			element.Name = data.Name;
+			//Absence means unlocked, the state every element had before locks existed.
+			element.IsLocked = data.IsLocked is true;
 
 			//Files saved by older versions could carry several tags; the first valid one becomes the element's single tag.
 			//Unknown tag names (saved by a newer version) are skipped instead of failing the whole document.

@@ -230,6 +230,24 @@ namespace WhatSchedule.Documents
 		}
 	}
 
+	/// <summary>Lock taken from or given to an element, so it refuses to be moved or scaled directly on the canvas.</summary>
+	internal sealed class ElementLockAction(CanvasElement element, bool before, bool after) : IHistoryAction
+	{
+		public string Description => (after ? "Lock " : "Unlock ") + element.Kind;
+
+		public void Undo(Document document)
+		{
+			element.IsLocked = before;
+			document.RaiseChanged();
+		}
+
+		public void Redo(Document document)
+		{
+			element.IsLocked = after;
+			document.RaiseChanged();
+		}
+	}
+
 	/// <summary>An element whose state changed (e.g. by moving or scaling it).</summary>
 	internal sealed class ElementStateAction(CanvasElement element, CanvasElement.ElementState before, CanvasElement.ElementState after, string description) : IHistoryAction
 	{

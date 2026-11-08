@@ -223,6 +223,7 @@ public partial class MainWindowViewModel : ObservableObject
 			Name = "Art section"
 		};
 		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_outline.png"), new SKPoint() { X = -314, Y = -462 }), 0);
+		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_temporary.png"), new SKPoint() { X = -289, Y = -445 }) { Name = "User art" }, 0);
 		artSection.Position = new SKPoint(386, 540);
 		document.Add(artSection);
 
@@ -260,13 +261,13 @@ public partial class MainWindowViewModel : ObservableObject
 				Alignment = Rendering.Definitions.TextAlignment.Center,
 				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
 				FontFamily = "Impact",
-				FontSize = 38				
+				FontSize = 38
 			}, 4);
 
 			dayGroup.InsertChild(new LabelElement()
 			{
 				Text = $"CET:",
-				Position = new SKPoint(403, -58),
+				Position = new SKPoint(403, -60),
 				Width = 124,
 				Height = 34,
 				Alignment = Rendering.Definitions.TextAlignment.Center,
@@ -277,7 +278,7 @@ public partial class MainWindowViewModel : ObservableObject
 			dayGroup.InsertChild(new LabelElement()
 			{
 				Text = $"{{{ScheduleVariables.TimeName(dayOfTheWeek)}}}",
-				Position = new SKPoint(423, -28),
+				Position = new SKPoint(423, -32),
 				Width = 124,
 				Height = 34,
 				Alignment = Rendering.Definitions.TextAlignment.Center,
@@ -300,7 +301,7 @@ public partial class MainWindowViewModel : ObservableObject
 			dayGroup.InsertChild(new LabelElement()
 			{
 				Text = $"{{{ScheduleVariables.ConvertedTimeName(dayOfTheWeek, "WIB")}}}",
-				Position = new SKPoint(403, 28),
+				Position = new SKPoint(403, 26),
 				Width = 124,
 				Height = 34,
 				Alignment = Rendering.Definitions.TextAlignment.Center,

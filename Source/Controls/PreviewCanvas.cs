@@ -922,7 +922,7 @@ public class PreviewCanvas : Control, IDisposable
 			var childFilter = element.ChildFilter(filter);
 			for (var i = group.Children.Count - 1; i >= 0; i--)
 			{
-				if (group.Children[i].PassesFilter(childFilter) && HitTest(group.Children[i], point, childFilter) is { } child)
+				if (group.Children[i].IsDisplayed(childFilter) && HitTest(group.Children[i], point, childFilter) is { } child)
 					return child;
 			}
 

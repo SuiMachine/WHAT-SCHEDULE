@@ -245,6 +245,18 @@ public sealed class Document
 		RaiseChanged();
 	}
 
+	/// <summary>Sets <paramref name="element"/>'s visibility and records the change in the undo history; a hidden
+	/// element is not drawn into the document and cannot be picked on the canvas, but still travels with its group.</summary>
+	public void SetHiddenTracked(CanvasElement element, bool hidden)
+	{
+		if (element.IsHidden == hidden)
+			return;
+
+		element.IsHidden = hidden;
+		History.Push(new ElementHiddenAction(element, !hidden, hidden));
+		RaiseChanged();
+	}
+
 	/// <summary>Records an element state change in the undo history, skipping it when the state did not actually change.</summary>
 	public void RecordStateChange(CanvasElement element, CanvasElement.ElementState before, string description)
 	{

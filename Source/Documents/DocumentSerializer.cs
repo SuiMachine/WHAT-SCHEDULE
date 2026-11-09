@@ -330,6 +330,9 @@ namespace WhatSchedule.Documents
 			//Absence means unlocked, the state every element had before locks existed.
 			element.IsLocked = data.IsLocked is true;
 
+			//Absence means showing, the state every element had before hiding existed.
+			element.IsHidden = data.IsHidden is true;
+
 			//Files saved by older versions could carry several tags; the first valid one becomes the element's single tag.
 			//Unknown tag names (saved by a newer version) are skipped instead of failing the whole document.
 			if (data.Tags is { } saved)

@@ -39,6 +39,11 @@ public abstract class CanvasElement
 	/// still carries its locked children with its own transform, and the hierarchy view's row menu sets the lock.</summary>
 	public bool IsLocked { get; set; }
 
+	/// <summary>Whether the element is kept out of the document: it is not drawn, not rendered into exports
+	/// and not picked on the canvas, but still listed in the hierarchy view, whose row menu toggles it.
+	/// A hidden group hides everything inside it; its contents keep their place and return when it shows again.</summary>
+	public bool IsHidden { get; set; }
+
 	/// <summary>The element's name as shown in the hierarchy list; the user-given name, the kind by default.</summary>
 	public virtual string DisplayName => Name ?? Kind;
 
@@ -199,6 +204,10 @@ public abstract class CanvasElement
 	/// <summary>The filter the element's children render under: none when the element's own tag matches the filter, since then its whole content shows.</summary>
 	internal ScheduleActivity? ChildFilter(ScheduleActivity? filter) => filter is not null && Tag?.Activity == filter ? null : filter;
 
+	/// <summary>Whether the element is displayed under the activity <paramref name="filter"/>: a hidden element is
+	/// never drawn and never picked on the canvas, and neither is a group's content while the group stays hidden.</summary>
+	internal bool IsDisplayed(ScheduleActivity? filter) => !IsHidden && PassesFilter(filter);
+
 	/// <summary>
 	/// State of an element captured when a scale drag starts, so every drag step can be
 	/// applied relative to the element as it was when the drag began.
@@ -253,6 +262,9 @@ public abstract class CanvasElement
 
 		/// <summary>Whether the element is locked against direct canvas manipulation; null (absent) when it is not, so files saved by older versions load unchanged.</summary>
 		public bool? IsLocked { get; set; }
+
+		/// <summary>Whether the element is kept out of the document; null (absent) when it shows, so files saved by older versions load unchanged.</summary>
+		public bool? IsHidden { get; set; }
 
 		/// <summary>The element's local position in its parent's content space.</summary>
 		public PointData Position { get; set; } = new();

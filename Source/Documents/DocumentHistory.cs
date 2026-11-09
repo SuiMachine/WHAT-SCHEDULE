@@ -248,6 +248,24 @@ namespace WhatSchedule.Documents
 		}
 	}
 
+	/// <summary>Visibility taken from or given to an element, so it is not drawn into the document while the flag lasts.</summary>
+	internal sealed class ElementHiddenAction(CanvasElement element, bool before, bool after) : IHistoryAction
+	{
+		public string Description => (after ? "Hide " : "Show ") + element.Kind;
+
+		public void Undo(Document document)
+		{
+			element.IsHidden = before;
+			document.RaiseChanged();
+		}
+
+		public void Redo(Document document)
+		{
+			element.IsHidden = after;
+			document.RaiseChanged();
+		}
+	}
+
 	/// <summary>An element whose state changed (e.g. by moving or scaling it).</summary>
 	internal sealed class ElementStateAction(CanvasElement element, CanvasElement.ElementState before, CanvasElement.ElementState after, string description) : IHistoryAction
 	{

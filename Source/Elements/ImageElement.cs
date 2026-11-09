@@ -339,6 +339,7 @@ namespace WhatSchedule.Elements
 			clone.RestoreState(CaptureState());
 			clone.Tag = Tag;
 			clone.IsLocked = IsLocked;
+			clone.IsHidden = IsHidden;
 			return clone;
 		}
 

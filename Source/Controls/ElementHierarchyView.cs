@@ -19,8 +19,9 @@ namespace WhatSchedule.Controls;
 /// at that exact spot, which reorders it among its own level, moves it into the group whose elements surround
 /// the spot, or leaves its group for the root level — or onto a row: anywhere on a group's row it joins
 /// that group at the top, onto a plain row's mid band the two are wrapped in a new group. Right-clicking
-/// a row opens a menu that tags, locks, renames or deletes its element; a locked element cannot be moved
-/// or scaled directly on the canvas, only carried by its group. Every change is recorded in the document's undo history.
+/// a row opens a menu that tags, locks, hides, renames or deletes its element; a locked element cannot be moved
+/// or scaled directly on the canvas, only carried by its group, and a hidden element stays out of the document
+/// until it is shown again. Every change is recorded in the document's undo history.
 /// </summary>
 public sealed class ElementHierarchyView : Control
 {
@@ -45,6 +46,9 @@ public sealed class ElementHierarchyView : Control
 
 	/// <summary>The lock item of the row menu, kept so the menu can be re-checked for the element it is opened on.</summary>
 	private readonly MenuItem lockItem;
+
+	/// <summary>The hide item of the row menu, kept so the menu can be re-checked for the element it is opened on.</summary>
+	private readonly MenuItem hideItem;
 
 	/// <summary>The vertical scroll offset of the list, in pixels, when it outgrows the view.</summary>
 	private double scrollOffset;
@@ -110,6 +114,10 @@ public sealed class ElementHierarchyView : Control
 		lockItem.Click += (_, _) => ToggleLock();
 		this.lockItem = lockItem;
 
+		var hideItem = new MenuItem { Header = "Hide", ToggleType = MenuItemToggleType.CheckBox };
+		hideItem.Click += (_, _) => ToggleHidden();
+		this.hideItem = hideItem;
+
 		var renameItem = new MenuItem { Header = "Rename..." };
 		renameItem.Click += async (_, _) => await RenameElementAsync();
 
@@ -120,6 +128,7 @@ public sealed class ElementHierarchyView : Control
 		rowMenu.Items.Add(tagsItem);
 		rowMenu.Items.Add(new Separator());
 		rowMenu.Items.Add(lockItem);
+		rowMenu.Items.Add(hideItem);
 		rowMenu.Items.Add(renameItem);
 		rowMenu.Items.Add(deleteItem);
 
@@ -238,11 +247,12 @@ public sealed class ElementHierarchyView : Control
 		}
 	}
 
-	/// <summary>The row's display name; group rows are bold so containers stand out from their contents, and locked rows are dimmed, since they sit still.</summary>
+	/// <summary>The row's display name; group rows are bold so containers stand out from their contents, and locked
+	/// and hidden rows are dimmed: they either sit still or stay out of the document.</summary>
 	private static FormattedText CreateLabel(CanvasElement element)
 	{
 		var typeface = element is GroupElement ? GroupTypeface : ThemeDefinition.LabelTypeface;
-		return new FormattedText(element.DisplayName, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, FontSize, element.IsLocked ? ThemeDefinition.RulerTick : ThemeDefinition.RulerLabel);
+		return new FormattedText(element.DisplayName, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, FontSize, element.IsLocked || element.IsHidden ? ThemeDefinition.RulerTick : ThemeDefinition.RulerLabel);
 	}
 
 	public override void Render(DrawingContext context)
@@ -376,6 +386,9 @@ public sealed class ElementHierarchyView : Control
 		//The lock item is re-checked every time, for the same reason the tag items are.
 		lockItem.IsChecked = element.IsLocked;
 
+		//The hide item is re-checked every time, for the same reason the lock item is.
+		hideItem.IsChecked = element.IsHidden;
+
 		//A day the element is tagged with shows the full tag in its header, so the choice is visible without opening the day.
 		foreach (var pair in dayItems)
 			pair.Key.Header = element.Tag is { } tag && tag.Day == pair.Value ? tag.DisplayName : pair.Value.ToString();
@@ -405,6 +418,14 @@ public sealed class ElementHierarchyView : Control
 	{
 		if (menuElement is { } element && canvas?.Document is { } document)
 			document.SetLockTracked(element, !element.IsLocked);
+	}
+
+	/// <summary>Toggles the menu's element's visibility, recorded in the undo history; a hidden element stays
+	/// out of the document, not drawn and not picked on the canvas, until it is shown again from this menu.</summary>
+	private void ToggleHidden()
+	{
+		if (menuElement is { } element && canvas?.Document is { } document)
+			document.SetHiddenTracked(element, !element.IsHidden);
 	}
 
 	/// <summary>Asks for a new name for the menu's element and records the rename in the undo history; an empty answer falls back to the element's kind.</summary>

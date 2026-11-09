@@ -41,7 +41,7 @@ public static class DocumentRenderer
 		//Groups draw their own children inside their transform, so only the roots are drawn here.
 		foreach (var element in document.RootElements)
 		{
-			if (element.PassesFilter(filter))
+			if (element.IsDisplayed(filter))
 				element.Draw(canvas, filter);
 		}
 	}

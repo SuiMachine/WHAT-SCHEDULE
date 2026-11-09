@@ -87,7 +87,8 @@ public sealed class GroupElement : CanvasElement
 	}
 
 	/// <summary>Draws the children inside the group's transform, clipped to the vector mask polygon when one is
-	/// set; the canvas state is the parent's content space. Only children passing the activity filter are drawn.</summary>
+	/// set; the canvas state is the parent's content space. Only displayed children are drawn: hidden ones and
+	/// those failing the activity filter stay out.</summary>
 	public override void Draw(SKCanvas canvas, ScheduleActivity? filter)
 	{
 		var count = canvas.Save();
@@ -105,7 +106,7 @@ public sealed class GroupElement : CanvasElement
 		}
 		var childFilter = ChildFilter(filter);
 		foreach (var child in children)
-			if (child.PassesFilter(childFilter))
+			if (child.IsDisplayed(childFilter))
 				child.Draw(canvas, childFilter);
 		canvas.RestoreToCount(count);
 	}
@@ -211,6 +212,7 @@ public sealed class GroupElement : CanvasElement
 		clone.RestoreState(CaptureState());
 		clone.Tag = Tag;
 		clone.IsLocked = IsLocked;
+		clone.IsHidden = IsHidden;
 		foreach (var child in children)
 			clone.InsertChild(child.Clone(), clone.children.Count);
 

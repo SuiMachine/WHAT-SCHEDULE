@@ -74,7 +74,7 @@ public static class PsdImporter
 					var children = stack.Count > 0 ? stack.Pop() : new List<CanvasElement>();
 					if (children.Count > 0)
 					{
-						var group = new GroupElement { Name = layer.Name };
+						var group = new GroupElement { Name = layer.Name, IsHidden = layer.Hidden };
 						foreach (var child in children)
 							group.InsertChild(child, group.Children.Count);
 						group.RebaseToContentBounds();
@@ -82,9 +82,14 @@ public static class PsdImporter
 					}
 					break;
 				default:
-					//The background layer becomes the document background instead of an element.
-					if (!layer.Hidden && !ReferenceEquals(layer, backgroundLayer) && CreateElement(layer) is { } element)
+					//The background layer becomes the document background instead of an element; a layer hidden in
+					//the file arrives hidden, holding its pixels and place until the hierarchy view shows it again.
+					if (!ReferenceEquals(layer, backgroundLayer) && CreateElement(layer) is { } element)
+					{
+						if (layer.Hidden)
+							element.IsHidden = true;
 						Place(element);
+					}
 					break;
 			}
 		}

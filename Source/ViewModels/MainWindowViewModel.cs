@@ -291,6 +291,17 @@ public partial class MainWindowViewModel : ObservableObject
 				FontFamily = "Impact",
 				FontSize = 38
 			}, 4);
+			dayGroup.InsertChild(new LabelElement()
+			{
+				Text = $"{{{ScheduleVariables.TitleName(dayOfTheWeek)}}}",
+				Position = new SKPoint(-412, -54),
+				Width = 826,
+				Height = 112,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 38
+			}, 4);
 
 			dayGroup.InsertChild(new LabelElement()
 			{

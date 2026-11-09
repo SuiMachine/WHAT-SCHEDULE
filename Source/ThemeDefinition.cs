@@ -62,8 +62,8 @@ public static class ThemeDefinition
 		/// <summary>How far the pointer must move before a pressed row turns into a drag, in pixels.</summary>
 		public const double DragThreshold = 3;
 
-		/// <summary>The part of a row around its vertical center that drops the dragged element onto the row instead of between rows.</summary>
-		public const double DropBand = 0.5;
+		/// <summary>The part of a row around its vertical center that drops the dragged element onto the row instead of between rows; narrow, so between-row drops dominate.</summary>
+		public const double DropBand = 0.25;
 
 		/// <summary>The highlight of the row of the element selected on the canvas.</summary>
 		public static readonly ISolidColorBrush SelectedRowFill = new ImmutableSolidColorBrush(Selection.Color, 0.2);

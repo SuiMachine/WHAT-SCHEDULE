@@ -14,10 +14,11 @@ namespace WhatSchedule.Controls;
 /// <summary>
 /// The document's element tree, docked under the inspector: the topmost element of each container is
 /// listed first with a group's children indented below it, and a group's chevron hides or shows them,
-/// since group contents are often many. The top edge resizes the view, clicking a row selects the
-/// element on the canvas, and dragging a row either reorders it (dropped between rows), moves it
-/// into or out of a group (dropped between rows at another level), or drops it onto a row:
-/// onto a group it joins that group, onto a plain element the two are wrapped in a new group. Right-clicking
+/// since group contents are often many. The top edge resizes the view, clicking a row selects
+/// the element on the canvas, and dragging a row either drops it on the insertion line between rows — landing
+/// at that exact spot, which reorders it among its own level, moves it into the group whose elements surround
+/// the spot, or leaves its group for the root level — or onto a row: anywhere on a group's row it joins
+/// that group at the top, onto a plain row's mid band the two are wrapped in a new group. Right-clicking
 /// a row opens a menu that tags, locks, renames or deletes its element; a locked element cannot be moved
 /// or scaled directly on the canvas, only carried by its group. Every change is recorded in the document's undo history.
 /// </summary>
@@ -525,25 +526,42 @@ public sealed class ElementHierarchyView : Control
 		UpdateHover(position);
 	}
 
-	/// <summary>Decides what the dragged element would land on at <paramref name="position"/>: a row's drop band or a boundary between rows.</summary>
+	/// <summary>Decides what the dragged element would land on at <paramref name="position"/>: a group's
+	/// whole row takes it into the group, a plain row's drop band wraps it with that row's element in a new
+	/// group, and anywhere else it lands on the boundary between rows.</summary>
 	private void UpdateDrop(Point position)
 	{
 		dropRow = null;
 		dragTarget = -1;
 
-		if (RowAt(position) is { } row && IsValidDropTarget(rows[row].Element))
+		if (RowAt(position) is { } row)
 		{
-			//Only the band around a row's vertical center drops onto the row; the edges drop between rows instead.
-			var offsetInRow = position.Y - (ListTop + row * RowHeight - scrollOffset);
-			if (offsetInRow >= RowHeight * (1 - DropBand) / 2 && offsetInRow <= RowHeight * (1 + DropBand) / 2)
+			//A group's whole row takes the dragged element in, so aiming at the group from anywhere on it joins.
+			if (rows[row].Element is GroupElement group && CanDropOnGroup(group))
 			{
 				dropRow = rows[row];
 				return;
+			}
+
+			if (IsValidDropTarget(rows[row].Element))
+			{
+				//Only the band around a row's vertical center drops onto the row; the edges drop between rows instead.
+				var offsetInRow = position.Y - (ListTop + row * RowHeight - scrollOffset);
+				if (offsetInRow >= RowHeight * (1 - DropBand) / 2 && offsetInRow <= RowHeight * (1 + DropBand) / 2)
+				{
+					dropRow = rows[row];
+					return;
+				}
 			}
 		}
 
 		dragTarget = (int)Math.Clamp(Math.Round((position.Y - ListTop + scrollOffset) / RowHeight), 0, rows.Count);
 	}
+
+	/// <summary>Whether the dragged element may land on <paramref name="group"/>'s row: not itself and not one of
+	/// the groups nested inside it; a member of the group lands back in it, at its top.</summary>
+	private bool CanDropOnGroup(GroupElement group) =>
+		dragElement is not null && !ReferenceEquals(dragElement, group) && !IsDescendantOf(group, dragElement);
 
 	/// <summary>Whether the dragged element may land on <paramref name="element"/>: not itself and not one of its own contents.</summary>
 	private bool IsValidDropTarget(CanvasElement element) =>
@@ -598,7 +616,8 @@ public sealed class ElementHierarchyView : Control
 		InvalidateVisual();
 	}
 
-	/// <summary>Drops <paramref name="element"/> onto <paramref name="target"/>: a group takes it in, a plain element is wrapped in a new group with it.</summary>
+	/// <summary>Drops <paramref name="element"/> onto <paramref name="target"/>'s row: a group takes it into
+	/// the group's top — a member already in it just moves up to that top — and a plain element is wrapped in a new group with it.</summary>
 	private void DropOnRow(CanvasElement element, CanvasElement target)
 	{
 		if (canvas?.Document is not { } document)
@@ -606,11 +625,16 @@ public sealed class ElementHierarchyView : Control
 
 		if (target is GroupElement group)
 		{
-			if (element.Parent == group)
-				return;
-
 			//Dropping onto a collapsed group shows its contents again, so the newcomer is where the eye lands.
 			collapsedGroups.Remove(group);
+
+			//A member of the group is already in it; landing on the group's head moves it to the group's top.
+			if (element.Parent == group)
+			{
+				document.ReorderToTracked(element, group.Children.Count - 1);
+				return;
+			}
+
 			document.ReparentTracked(element, group, group.Children.Count, "Group " + element.Kind);
 			return;
 		}
@@ -622,8 +646,9 @@ public sealed class ElementHierarchyView : Control
 	}
 
 	/// <summary>
-	/// Drops <paramref name="element"/> on the display <paramref name="boundary"/>: at its own level it reorders,
-	/// at another level it moves into the group there, and at the root level it leaves its group, keeping its place on the canvas.
+	/// Drops <paramref name="element"/> on the display <paramref name="boundary"/>: it lands exactly on
+	/// the insertion line, above the row below it — at its own level that reorders, at another level it moves
+	/// into the group there between its elements, and at the root level it leaves its group, keeping its place on the canvas.
 	/// </summary>
 	private void DropAtBoundary(CanvasElement element, int boundary)
 	{
@@ -642,14 +667,17 @@ public sealed class ElementHierarchyView : Control
 		else
 		{
 			container = rows[boundary].Container;
-			index = rows[boundary].DrawIndex;
+			//The list shows a container's children topmost first, the reverse of their index order, so
+			//landing on the line means one index after the row below it: directly above it in the list.
+			index = rows[boundary].DrawIndex + 1;
 		}
-
-		if (container is not null && !IsValidDropTarget(container))
-			return;
 
 		if (element.Parent == container)
 		{
+			//The boundary directly above the dragged element's own row drops it back where it was.
+			if (boundary < rows.Count && ReferenceEquals(rows[boundary].Element, element))
+				return;
+
 			var current = document.IndexOf(element);
 			//The target index counts the element still sitting in the container; moving up means one slot less.
 			if (current >= 0 && current < index)
@@ -658,6 +686,11 @@ public sealed class ElementHierarchyView : Control
 			document.ReorderToTracked(element, index);
 			return;
 		}
+
+		//A reparent must not drop an element into itself or into a group nested inside its own contents;
+		//deeper levels are fine to leave, so a member of a nested group can rise into the surrounding group.
+		if (container is not null && (ReferenceEquals(element, container) || IsDescendantOf(container, element)))
+			return;
 
 		var description = container is null ? "Ungroup " + element.Kind : "Group " + element.Kind;
 		document.ReparentTracked(element, container, index, description);

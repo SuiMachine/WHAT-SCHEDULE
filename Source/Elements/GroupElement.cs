@@ -29,6 +29,11 @@ public sealed class GroupElement : CanvasElement
 	/// <summary>Vertical scale of the group's content, 1 being the children's natural size.</summary>
 	public float ScaleY { get; set; } = 1f;
 
+	/// <summary>The group's vector mask: the polygon's vertices in the group's content space, closed into a
+	/// loop, its children clipped to it when rendered; null or fewer than three vertices show everything.
+	/// It scales and rotates with the group, since it lives in the content space.</summary>
+	public List<SKPoint>? Mask { get; set; }
+
 	/// <summary>The group's extent in its own content space, i.e. the union of the children's boxes.</summary>
 	public override SKSize Size => ContentBounds.Size;
 
@@ -81,13 +86,23 @@ public sealed class GroupElement : CanvasElement
 		return new SKPoint(ScaleX != 0 ? rotated.X / ScaleX : rotated.X, ScaleY != 0 ? rotated.Y / ScaleY : rotated.Y);
 	}
 
-	/// <summary>Draws the children inside the group's transform; the canvas state is the parent's content space. Only children passing the activity filter are drawn.</summary>
+	/// <summary>Draws the children inside the group's transform, clipped to the vector mask polygon when one is
+	/// set; the canvas state is the parent's content space. Only children passing the activity filter are drawn.</summary>
 	public override void Draw(SKCanvas canvas, ScheduleActivity? filter)
 	{
 		var count = canvas.Save();
 		canvas.Translate(Position.X, Position.Y);
 		canvas.RotateDegrees(Rotation);
 		canvas.Scale(ScaleX, ScaleY);
+		if (Mask is { Count: >= 3 } vertices)
+		{
+			using var clip = new SKPath();
+			clip.MoveTo(vertices[0]);
+			for (var i = 1; i < vertices.Count; i++)
+				clip.LineTo(vertices[i]);
+			clip.Close();
+			canvas.ClipPath(clip, antialias: true);
+		}
 		var childFilter = ChildFilter(filter);
 		foreach (var child in children)
 			if (child.PassesFilter(childFilter))
@@ -148,6 +163,11 @@ public sealed class GroupElement : CanvasElement
 		foreach (var child in children)
 			child.Position -= delta;
 
+		//The mask lives in the same content space as the children, so the rebase shifts it with them.
+		if (Mask is { } vertices)
+			for (var i = 0; i < vertices.Count; i++)
+				vertices[i] -= delta;
+
 		Position += RotateVector(new SKPoint(delta.X * ScaleX, delta.Y * ScaleY), Rotation);
 		return delta;
 	}
@@ -169,7 +189,7 @@ public sealed class GroupElement : CanvasElement
 	/// <summary>The index of <paramref name="child"/> in the group, or -1 when it is not in it.</summary>
 	internal int IndexOfChild(CanvasElement child) => children.IndexOf(child);
 
-	public override ElementState CaptureState() => new GroupElementState(Position, Rotation, ScaleX, ScaleY);
+	public override ElementState CaptureState() => new GroupElementState(Position, Rotation, ScaleX, ScaleY, Mask?.ToArray());
 
 	public override void RestoreState(ElementState state)
 	{
@@ -180,6 +200,8 @@ public sealed class GroupElement : CanvasElement
 		Rotation = snapshot.Rotation;
 		ScaleX = snapshot.ScaleX;
 		ScaleY = snapshot.ScaleY;
+		//The snapshot's array is copied, so later mask edits never rewrite what undo restores from.
+		Mask = snapshot.Mask?.ToList();
 	}
 
 	/// <summary>Creates a deep copy of the group by restoring its own state and cloning every child into it.</summary>
@@ -188,24 +210,28 @@ public sealed class GroupElement : CanvasElement
 		var clone = new GroupElement();
 		clone.RestoreState(CaptureState());
 		clone.Tag = Tag;
+		clone.IsLocked = IsLocked;
 		foreach (var child in children)
 			clone.InsertChild(child.Clone(), clone.children.Count);
 
 		return clone;
 	}
 
-	/// <summary>The group's own rows: the scale factors of its content. Position and layering are handled by the panel.</summary>
+	/// <summary>The group's own rows: the scale factors of its content and its vector mask. Position and layering are handled by the panel.</summary>
 	public override void BuildInspectorRows(IInspectorBuilder builder)
 	{
 		builder.AddSection("Scale");
 		builder.AddNumber("Scale X", () => ScaleX, value => ScaleX = Math.Max(MinScale, value));
 		builder.AddNumber("Scale Y", () => ScaleY, value => ScaleY = Math.Max(MinScale, value));
+		builder.AddSection("Vector Mask");
+		builder.AddVectorMaskEditor(this);
 	}
 
 	/// <summary>The group's frame and transform captured when a scale drag starts, so every drag step is applied relative to the group as it was.</summary>
 	public sealed record GroupScaleState(SKRect Bounds, SKPoint Position, float Rotation, float ScaleX, float ScaleY) : ScaleState;
 
-	public sealed record GroupElementState(SKPoint Position, float Rotation, float ScaleX, float ScaleY) : ElementState;
+	/// <summary>Points compare by reference in records, so the undo history never compares mask snapshots for equality.</summary>
+	public sealed record GroupElementState(SKPoint Position, float Rotation, float ScaleX, float ScaleY, SKPoint[]? Mask) : ElementState;
 
 	public sealed class GroupElementData : ElementData
 	{
@@ -216,6 +242,9 @@ public sealed class GroupElement : CanvasElement
 		public float ScaleX { get; set; } = 1f;
 
 		public float ScaleY { get; set; } = 1f;
+
+		/// <summary>The vector mask's vertices in the group's content space, closing into a loop; null when the group has no mask, so files saved by older versions load unchanged.</summary>
+		public List<CanvasElement.PointData>? Mask { get; set; }
 
 		/// <summary>The group's child elements, nested recursively, in rendering order bottom first.</summary>
 		public List<ElementData> Children { get; set; } = new();

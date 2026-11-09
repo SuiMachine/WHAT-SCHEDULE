@@ -17,6 +17,8 @@ internal sealed class CanvasMenus
 	private readonly ContextMenu canvasMenu;
 	private readonly MenuItem bringForwardItem;
 	private readonly MenuItem sendBackwardItem;
+	private readonly MenuItem replaceImageItem;
+	private readonly MenuItem lockItem;
 	private SKPoint contextMenuPosition;
 
 	public CanvasMenus(PreviewCanvas canvas)
@@ -28,6 +30,20 @@ internal sealed class CanvasMenus
 
 		sendBackwardItem = new MenuItem { Header = "Send Backward" };
 		sendBackwardItem.Click += (_, _) => ReorderSelected(-1);
+
+		replaceImageItem = new MenuItem { Header = "Replace Image..." };
+		replaceImageItem.Click += async (_, _) =>
+		{
+			if (canvas.Selection.SelectedElement is ImageElement image)
+				await ReplaceImageAsync(image);
+		};
+
+		lockItem = new MenuItem { Header = "Lock", ToggleType = MenuItemToggleType.CheckBox };
+		lockItem.Click += (_, _) =>
+		{
+			if (canvas.Selection.SelectedElement is { } element && canvas.Document is { } document)
+				document.SetLockTracked(element, !element.IsLocked);
+		};
 
 		rulerMenu = BuildRulerMenu();
 		canvasMenu = BuildCanvasMenu();
@@ -82,6 +98,11 @@ internal sealed class CanvasMenus
 
 		bringForwardItem.IsEnabled = index >= 0 && index < elements!.Count - 1;
 		sendBackwardItem.IsEnabled = index > 0;
+		replaceImageItem.IsVisible = selected is ImageElement;
+
+		//The lock acts on the selected element, so it is checked to it and disabled without one.
+		lockItem.IsChecked = selected is { IsLocked: true };
+		lockItem.IsEnabled = selected is not null;
 	}
 
 	private void Open(ContextMenu menu)
@@ -132,9 +153,12 @@ internal sealed class CanvasMenus
 
 		menu.Items.Add(addLabel);
 		menu.Items.Add(addImage);
+		menu.Items.Add(replaceImageItem);
 		menu.Items.Add(new Separator());
 		menu.Items.Add(bringForwardItem);
 		menu.Items.Add(sendBackwardItem);
+		menu.Items.Add(new Separator());
+		menu.Items.Add(lockItem);
 		return menu;
 	}
 
@@ -190,5 +214,56 @@ internal sealed class CanvasMenus
 			return;
 
 		document.AddTracked(new ImageElement(bitmap, position));
+	}
+
+	/// <summary>
+	/// Replaces <paramref name="element"/>'s bitmap with one picked from a file, keeping the element's box: a bitmap whose
+	/// aspect ratio matches swaps in uncropped, a taller one is center-cropped off its top and bottom and a wider one off
+	/// its left and right sides (with the user warned first, since pixels are lost) so the bitmap fills the box.
+	/// </summary>
+	public async Task ReplaceImageAsync(ImageElement element)
+	{
+		var document = canvas.Document;
+		if (document is null || !document.ContainsElement(element))
+			return;
+
+		if (TopLevel.GetTopLevel(canvas) is not Window window)
+			return;
+
+		var files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+		{
+			Title = "Replace image",
+			AllowMultiple = false,
+			FileTypeFilter = [FilePickerFileTypes.ImageAll],
+		});
+		if (files.Count != 1)
+			return;
+
+		await using var stream = await files[0].OpenReadAsync();
+		var bitmap = SKBitmap.Decode(stream);
+		if (bitmap is null)
+		{
+			await ConfirmationDialog.ShowMessage(window, "Replace Image", "The file could not be loaded as an image.");
+			return;
+		}
+
+		var fit = element.MeasureBitmapFit(bitmap);
+		if (fit != BitmapFit.Same)
+		{
+			var relation = fit == BitmapFit.Taller ? "taller than" : "wider than";
+			var cropped = fit == BitmapFit.Taller ? "from the top and bottom" : "from the left and right sides";
+			if (!await ConfirmationDialog.ShowDialog(window, "Replace Image",
+				$"The new image is {relation} the image it replaces, so it will be cropped {cropped} to fit the replaced image's box. Replace it anyway?", "Replace"))
+			{
+				bitmap.Dispose();
+				return;
+			}
+		}
+
+		var replacement = element.CreateReplacement(bitmap);
+		document.ReplaceElementTracked(element, replacement);
+		canvas.Selection.SelectedElement = replacement;
+		canvas.Focus();
+		canvas.InvalidateVisual();
 	}
 }

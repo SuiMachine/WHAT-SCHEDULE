@@ -95,6 +95,24 @@ namespace WhatSchedule.Documents
 		}
 	}
 
+	/// <summary>An element swapped for a different one in place, keeping its container and layering slot.</summary>
+	internal sealed class ElementReplacementAction(GroupElement? parent, CanvasElement before, CanvasElement after, int index, string description) : IHistoryAction
+	{
+		public string Description => description;
+
+		public void Undo(Document document)
+		{
+			document.RemoveAt(parent, index);
+			document.Insert(parent, before, index);
+		}
+
+		public void Redo(Document document)
+		{
+			document.RemoveAt(parent, index);
+			document.Insert(parent, after, index);
+		}
+	}
+
 	/// <summary>An element moved within the layering order of its container.</summary>
 	internal sealed class ElementReorderAction(CanvasElement element, int before, int after) : IHistoryAction
 	{
@@ -212,6 +230,24 @@ namespace WhatSchedule.Documents
 		}
 	}
 
+	/// <summary>Lock taken from or given to an element, so it refuses to be moved or scaled directly on the canvas.</summary>
+	internal sealed class ElementLockAction(CanvasElement element, bool before, bool after) : IHistoryAction
+	{
+		public string Description => (after ? "Lock " : "Unlock ") + element.Kind;
+
+		public void Undo(Document document)
+		{
+			element.IsLocked = before;
+			document.RaiseChanged();
+		}
+
+		public void Redo(Document document)
+		{
+			element.IsLocked = after;
+			document.RaiseChanged();
+		}
+	}
+
 	/// <summary>An element whose state changed (e.g. by moving or scaling it).</summary>
 	internal sealed class ElementStateAction(CanvasElement element, CanvasElement.ElementState before, CanvasElement.ElementState after, string description) : IHistoryAction
 	{
@@ -227,6 +263,24 @@ namespace WhatSchedule.Documents
 		{
 			element.RestoreState(after);
 			document.RaiseChanged();
+		}
+	}
+
+	/// <summary>Several changes recorded as one, undone together in reverse order and redone together in their original order.</summary>
+	internal sealed class CompositeAction(string description, IReadOnlyList<IHistoryAction> actions) : IHistoryAction
+	{
+		public string Description => description;
+
+		public void Undo(Document document)
+		{
+			for (var i = actions.Count - 1; i >= 0; i--)
+				actions[i].Undo(document);
+		}
+
+		public void Redo(Document document)
+		{
+			foreach (var action in actions)
+				action.Redo(document);
 		}
 	}
 }

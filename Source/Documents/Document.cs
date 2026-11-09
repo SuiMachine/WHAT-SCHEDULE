@@ -60,6 +60,24 @@ public sealed class Document
 		History.Push(new ElementCollectionAction(null, element, rootElements.Count - 1, added: true));
 	}
 
+	/// <summary>Adds several elements to the document root in order and records the whole addition as one undo step.</summary>
+	public void AddRangeTracked(IReadOnlyList<CanvasElement> elements, string description)
+	{
+		if (elements.Count == 0)
+			return;
+
+		var index = rootElements.Count;
+		var actions = new List<IHistoryAction>(elements.Count);
+		foreach (var element in elements)
+		{
+			Insert(null, element, rootElements.Count);
+			actions.Add(new ElementCollectionAction(null, element, index, added: true));
+			index++;
+		}
+
+		History.Push(new CompositeAction(description, actions));
+	}
+
 	/// <summary>Removes an element (with everything inside it) and records the removal in the undo history. Returns false when the element is not in the document.</summary>
 	public bool RemoveTracked(CanvasElement element)
 	{
@@ -72,6 +90,23 @@ public sealed class Document
 		History.Push(new ElementCollectionAction(parent, element, index, added: false));
 		RaiseChanged();
 		return true;
+	}
+
+	/// <summary>
+	/// Puts <paramref name="replacement"/> in place of <paramref name="element"/> — same container, same layering slot —
+	/// and records the swap in the undo history. Used to swap an element whose whole identity changed (e.g. an image's
+	/// bitmap, which no element state carries) while keeping its box on the canvas.
+	/// </summary>
+	public void ReplaceElementTracked(CanvasElement element, CanvasElement replacement)
+	{
+		var parent = element.Parent;
+		var index = IndexOf(element);
+		if (index < 0)
+			return;
+
+		RemoveFrom(element);
+		Insert(parent, replacement, index);
+		History.Push(new ElementReplacementAction(parent, element, replacement, index, "Replace " + replacement.Kind));
 	}
 
 	/// <summary>
@@ -195,6 +230,18 @@ public sealed class Document
 		var before = element.Tag;
 		element.Tag = after;
 		History.Push(new ElementTagAction(element, before, after));
+		RaiseChanged();
+	}
+
+	/// <summary>Sets <paramref name="element"/>'s lock and records the change in the undo history; a locked element
+	/// refuses to be moved, scaled, rotated or cropped directly on the canvas.</summary>
+	public void SetLockTracked(CanvasElement element, bool locked)
+	{
+		if (element.IsLocked == locked)
+			return;
+
+		element.IsLocked = locked;
+		History.Push(new ElementLockAction(element, !locked, locked));
 		RaiseChanged();
 	}
 

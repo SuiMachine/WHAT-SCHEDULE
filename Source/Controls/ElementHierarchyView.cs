@@ -13,11 +13,13 @@ namespace WhatSchedule.Controls;
 
 /// <summary>
 /// The document's element tree, docked under the inspector: the topmost element of each container is
-/// listed first with a group's children indented below it. The top edge resizes the view, clicking a
-/// row selects the element on the canvas, and dragging a row either reorders it (dropped between rows),
-/// moves it into or out of a group (dropped between rows at another level), or drops it onto a row:
+/// listed first with a group's children indented below it, and a group's chevron hides or shows them,
+/// since group contents are often many. The top edge resizes the view, clicking a row selects the
+/// element on the canvas, and dragging a row either reorders it (dropped between rows), moves it
+/// into or out of a group (dropped between rows at another level), or drops it onto a row:
 /// onto a group it joins that group, onto a plain element the two are wrapped in a new group. Right-clicking
-/// a row opens a menu that tags, renames or deletes its element. Every change is recorded in the document's undo history.
+/// a row opens a menu that tags, locks, renames or deletes its element; a locked element cannot be moved
+/// or scaled directly on the canvas, only carried by its group. Every change is recorded in the document's undo history.
 /// </summary>
 public sealed class ElementHierarchyView : Control
 {
@@ -40,6 +42,9 @@ public sealed class ElementHierarchyView : Control
 	/// <summary>The element the row menu was opened for, kept because the menu outlives the rows it was built from.</summary>
 	private CanvasElement? menuElement;
 
+	/// <summary>The lock item of the row menu, kept so the menu can be re-checked for the element it is opened on.</summary>
+	private readonly MenuItem lockItem;
+
 	/// <summary>The vertical scroll offset of the list, in pixels, when it outgrows the view.</summary>
 	private double scrollOffset;
 
@@ -51,6 +56,10 @@ public sealed class ElementHierarchyView : Control
 
 	/// <summary>The element of the row being dragged, kept because <see cref="dragRow"/> goes away with the drag.</summary>
 	private CanvasElement? dragElement;
+
+	/// <summary>The groups whose rows the list hides until their chevron is clicked again; the choice survives
+	/// refreshes and selection changes, but not a document load. Empty groups never hide anything and are never in it.</summary>
+	private readonly HashSet<GroupElement> collapsedGroups = new();
 
 	/// <summary>The row the dragged element would be dropped onto, or null while it is not over a row's drop band.</summary>
 	private HierarchyRow? dropRow;
@@ -96,6 +105,10 @@ public sealed class ElementHierarchyView : Control
 			tagsItem.Items.Add(dayItem);
 		}
 
+		var lockItem = new MenuItem { Header = "Lock", ToggleType = MenuItemToggleType.CheckBox };
+		lockItem.Click += (_, _) => ToggleLock();
+		this.lockItem = lockItem;
+
 		var renameItem = new MenuItem { Header = "Rename..." };
 		renameItem.Click += async (_, _) => await RenameElementAsync();
 
@@ -105,6 +118,7 @@ public sealed class ElementHierarchyView : Control
 		rowMenu = new ContextMenu();
 		rowMenu.Items.Add(tagsItem);
 		rowMenu.Items.Add(new Separator());
+		rowMenu.Items.Add(lockItem);
 		rowMenu.Items.Add(renameItem);
 		rowMenu.Items.Add(deleteItem);
 
@@ -127,7 +141,8 @@ public sealed class ElementHierarchyView : Control
 			throw new InvalidOperationException("The hierarchy view is already bound to a canvas.");
 
 		canvas = owner;
-		canvas.SelectionChanged += Refresh;
+		//A selection made on the canvas lands in the list: the groups above the selected element open and its row scrolls into view.
+		canvas.SelectionChanged += RefreshRevealingSelection;
 		canvas.DocumentChanged += Refresh;
 		canvas.PropertyChanged += OnCanvasPropertyChanged;
 		Refresh();
@@ -137,7 +152,53 @@ public sealed class ElementHierarchyView : Control
 	private void OnCanvasPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs change)
 	{
 		if (change.Property == PreviewCanvas.DocumentProperty)
+		{
+			//The groups of one document say nothing about the groups of another.
+			collapsedGroups.Clear();
 			Refresh();
+		}
+	}
+
+	/// <summary>Rebuilds the list after the canvas selection changed, showing the selected element's row from
+	/// wherever it hides: the groups collapsed above the selection open, and a row outside the viewport scrolls in.</summary>
+	private void RefreshRevealingSelection()
+	{
+		var selected = canvas?.Selection.SelectedElement;
+		for (var ancestor = selected?.Parent; ancestor is not null; ancestor = ancestor.Parent)
+			collapsedGroups.Remove(ancestor);
+
+		Refresh();
+		ScrollSelectedIntoView(selected);
+	}
+
+	/// <summary>Scrolls <paramref name="selected"/>'s row into view when it lies outside, so the eye lands on the
+	/// row canvas clicks select; a row that already shows leaves the scroll where the user put it.</summary>
+	private void ScrollSelectedIntoView(CanvasElement? selected)
+	{
+		if (selected is null)
+			return;
+
+		var row = -1;
+		for (var i = 0; i < rows.Count; i++)
+		{
+			if (ReferenceEquals(rows[i].Element, selected))
+			{
+				row = i;
+				break;
+			}
+		}
+
+		if (row < 0)
+			return;
+
+		var viewport = Math.Max(0, Bounds.Height - ListTop);
+		var top = row * RowHeight - scrollOffset;
+		if (top >= 0 && top + RowHeight <= viewport)
+			return;
+
+		//The row was above the viewport, so it scrolls to the viewport's top; below, to the viewport's bottom.
+		scrollOffset = top < 0 ? row * RowHeight : (row + 1) * RowHeight - viewport;
+		scrollOffset = Math.Clamp(scrollOffset, 0, Math.Max(0, rows.Count * RowHeight - viewport));
 	}
 
 	/// <summary>Rebuilds the element rows from the current document; the selected row is matched live while rendering.</summary>
@@ -155,6 +216,9 @@ public sealed class ElementHierarchyView : Control
 		if (roots is not null)
 			Build(roots, null, 0);
 
+		//Groups that left the document (deleted or replaced) take their choice with them.
+		collapsedGroups.IntersectWith(rows.Select(row => row.Element).OfType<GroupElement>());
+
 		InvalidateVisual();
 	}
 
@@ -167,16 +231,17 @@ public sealed class ElementHierarchyView : Control
 			rows.Add(new HierarchyRow(element, depth, parent, i));
 			labels.Add(CreateLabel(element));
 
-			if (element is GroupElement group)
+			//A collapsed group lists nothing: its rows hide until its chevron is clicked again.
+			if (element is GroupElement group && !collapsedGroups.Contains(group))
 				Build(group.Children, group, depth + 1);
 		}
 	}
 
-	/// <summary>The row's display name; group rows are bold so containers stand out from their contents.</summary>
+	/// <summary>The row's display name; group rows are bold so containers stand out from their contents, and locked rows are dimmed, since they sit still.</summary>
 	private static FormattedText CreateLabel(CanvasElement element)
 	{
 		var typeface = element is GroupElement ? GroupTypeface : ThemeDefinition.LabelTypeface;
-		return new FormattedText(element.DisplayName, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, FontSize, ThemeDefinition.RulerLabel);
+		return new FormattedText(element.DisplayName, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, FontSize, element.IsLocked ? ThemeDefinition.RulerTick : ThemeDefinition.RulerLabel);
 	}
 
 	public override void Render(DrawingContext context)
@@ -222,7 +287,15 @@ public sealed class ElementHierarchyView : Control
 				if (row < rows.Count - 1)
 					context.DrawLine(SeparatorPen, new Point(0, top + RowHeight - 0.5), new Point(bounds.Width, top + RowHeight - 0.5));
 
-				var indent = TextPadding + rows[row].Depth * IndentWidth;
+				//Every row's name begins one indent in, reserving the level's slot before it for a group's chevron.
+				var gauge = TextPadding + rows[row].Depth * IndentWidth;
+				var indent = gauge + IndentWidth;
+				if (rows[row].Element is GroupElement { Children.Count: > 0 } groupRow)
+				{
+					using (context.PushTransform(Matrix.CreateTranslation(gauge + (IndentWidth - ChevronSize) / 2, top + (RowHeight - ChevronSize) / 2)))
+						context.DrawGeometry(null, ChevronPen, collapsedGroups.Contains(groupRow) ? CollapsedChevron : ExpandedChevron);
+				}
+
 				DrawName(context, labels[row], new Rect(indent, top, Math.Max(0, bounds.Width - indent - TextPadding), RowHeight));
 			}
 
@@ -299,6 +372,9 @@ public sealed class ElementHierarchyView : Control
 		foreach (var pair in tagItems)
 			pair.Key.IsChecked = element.Tag == pair.Value;
 
+		//The lock item is re-checked every time, for the same reason the tag items are.
+		lockItem.IsChecked = element.IsLocked;
+
 		//A day the element is tagged with shows the full tag in its header, so the choice is visible without opening the day.
 		foreach (var pair in dayItems)
 			pair.Key.Header = element.Tag is { } tag && tag.Day == pair.Value ? tag.DisplayName : pair.Value.ToString();
@@ -320,6 +396,14 @@ public sealed class ElementHierarchyView : Control
 	{
 		if (menuElement is { } element && canvas?.Document is { } document)
 			document.ToggleTagTracked(element, tag);
+	}
+
+	/// <summary>Toggles the menu's element's lock, recorded in the undo history; a locked element refuses to move,
+	/// scale or rotate directly on the canvas but still rides along with its group's own transform.</summary>
+	private void ToggleLock()
+	{
+		if (menuElement is { } element && canvas?.Document is { } document)
+			document.SetLockTracked(element, !element.IsLocked);
 	}
 
 	/// <summary>Asks for a new name for the menu's element and records the rename in the undo history; an empty answer falls back to the element's kind.</summary>
@@ -385,6 +469,14 @@ public sealed class ElementHierarchyView : Control
 
 		if (RowAt(point.Position) is not { } row || canvas is not { } owner)
 			return;
+
+		//A click on a group's chevron hides or shows its rows instead of selecting or dragging it.
+		if (rows[row].Element is GroupElement { Children.Count: > 0 } toggleGroup && IsOverChevron(point.Position, row))
+		{
+			ToggleCollapse(toggleGroup);
+			e.Handled = true;
+			return;
+		}
 
 		//Pressing a row selects it right away, like pressing the element on the canvas does; the
 		//canvas also takes focus, so the delete and layering shortcuts keep working. Selecting a
@@ -517,6 +609,8 @@ public sealed class ElementHierarchyView : Control
 			if (element.Parent == group)
 				return;
 
+			//Dropping onto a collapsed group shows its contents again, so the newcomer is where the eye lands.
+			collapsedGroups.Remove(group);
 			document.ReparentTracked(element, group, group.Children.Count, "Group " + element.Kind);
 			return;
 		}
@@ -624,5 +718,20 @@ public sealed class ElementHierarchyView : Control
 
 		var row = (int)Math.Floor((position.Y - ListTop + scrollOffset) / RowHeight);
 		return row >= 0 && row < rows.Count ? row : null;
+	}
+
+	/// <summary>Whether <paramref name="position"/> lies on the row's chevron slot, the indent the row's name follows after.</summary>
+	private bool IsOverChevron(Point position, int row)
+	{
+		var gauge = TextPadding + rows[row].Depth * IndentWidth;
+		return position.X >= gauge && position.X < gauge + IndentWidth;
+	}
+
+	/// <summary>Hides or shows the group's rows, keeping the choice across refreshes until the document changes.</summary>
+	private void ToggleCollapse(GroupElement group)
+	{
+		if (!collapsedGroups.Remove(group))
+			collapsedGroups.Add(group);
+		Refresh();
 	}
 }

@@ -32,6 +32,18 @@ public static class ThemeDefinition
 		/// <summary>The indent of one hierarchy level, in pixels.</summary>
 		public const double IndentWidth = 12;
 
+		/// <summary>The size of the group rows' expansion chevron, in pixels; the shape spans it.</summary>
+		public const double ChevronSize = 9;
+
+		/// <summary>The chevron of a group row whose children are listed, matching the inspector's section arrows.</summary>
+		public static readonly Geometry ExpandedChevron = Geometry.Parse("M0,2 L4.5,6 L9,2");
+
+		/// <summary>The chevron of a group row whose children are hidden, pointing at the ones it would show.</summary>
+		public static readonly Geometry CollapsedChevron = Geometry.Parse("M2,0 L6,4.5 L2,9");
+
+		/// <summary>The pen of the group rows' expansion chevrons.</summary>
+		public static readonly IPen ChevronPen = new Pen(RulerLabel, 1.5);
+
 		/// <summary>The width of the new group button in the header band, in pixels.</summary>
 		public const double NewGroupButtonWidth = 16;
 
@@ -96,12 +108,14 @@ public static class ThemeDefinition
 	public static readonly ISolidColorBrush RulerTick = new ImmutableSolidColorBrush(0xFF999999);
 	public static readonly ISolidColorBrush RulerLabel = new ImmutableSolidColorBrush(0xFFD4D4D4);
 	public static readonly ISolidColorBrush Selection = new ImmutableSolidColorBrush(0xFF4CC2FF);
+	public static readonly ISolidColorBrush SelectionLocked = new ImmutableSolidColorBrush(0xFFFF0000);
 	public static readonly ISolidColorBrush HandleFill = new ImmutableSolidColorBrush(Colors.White);
 	public static readonly ISolidColorBrush Guide = new ImmutableSolidColorBrush(0xFF00A2ED);
 
 	public static readonly IPen RulerBorderPen = new Pen(Border, 1);
 	public static readonly IPen TickPen = new Pen(RulerTick, 1);
 	public static readonly IPen SelectionPen = new Pen(Selection, 1);
+	public static readonly IPen SelectionPenLocked = new Pen(SelectionLocked, 1);
 	public static readonly IPen GuidePen = new Pen(Guide, 1) { DashStyle = DashStyle.Dash };
 	/// <summary>Dashed like <see cref="GuidePen"/> to read as a preview rather than a real border.</summary>
 	public static readonly IPen CropBoundsPen = new Pen(Selection, 1) { DashStyle = DashStyle.Dash };
@@ -119,6 +133,8 @@ public static class ThemeDefinition
 	public const double RotateHandleOffset = 20;
 	public const double RotationSnap = 15;
 	public const double GuideHitTolerance = 2;
+	/// <summary>Within this radius around the press point a held left button counts as a click, not a move drag, so an accidental nudge while selecting cannot shift the element.</summary>
+	public const double MoveStartRadius = 3;
 	public const double MinElementSize = 8;
 	public const float MinFontSize = 4;
 }

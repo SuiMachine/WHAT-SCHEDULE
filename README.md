@@ -11,3 +11,9 @@ This application targets Windows and Linux.
 ## Libraries used
 - [Avalonia (UI)](https://github.com/avaloniaui/avalonia)
 - [SkiaSharp](https://github.com/mono/skiasharp)
+
+## References used
+Simplified PSD importer was written based on:
+- [Adobe Photoshop File Formats Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/) - the format the importer reads.
+- [ag-psd](https://github.com/Agamnentzar/ag-psd)
+No direct code was used from either, but both helped to build a simplified importer.

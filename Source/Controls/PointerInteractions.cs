@@ -65,6 +65,7 @@ internal sealed class ElementMoveDrag : IPointerDrag
 	private readonly Point startPosition;
 	private readonly SKPoint startAnchor;
 	private readonly CanvasElement.ElementState startState;
+	private bool started;
 
 	public ElementMoveDrag(PreviewCanvas canvas, CanvasElement element, Point position)
 	{
@@ -84,6 +85,19 @@ internal sealed class ElementMoveDrag : IPointerDrag
 		var document = canvas.Document;
 		if (document is null)
 			return;
+
+		//Accidental-move protection: while the cursor stays within a small radius of the press point, the
+		//press is a click that only selects; the move starts once the cursor crosses the radius, in control
+		//pixels so the protection is the same at every zoom level.
+		if (!started)
+		{
+			var jitterX = position.X - startPosition.X;
+			var jitterY = position.Y - startPosition.Y;
+			if (jitterX * jitterX + jitterY * jitterY < ThemeDefinition.MoveStartRadius * ThemeDefinition.MoveStartRadius)
+				return;
+
+			started = true;
+		}
 
 		var scale = canvas.Viewport.Scale;
 		var delta = new SKPoint(
@@ -296,5 +310,87 @@ internal sealed class GuideDrag : IPointerDrag
 			document.RemoveGuide(guide);
 			canvas.InvalidateVisual();
 		}
+	}
+}
+
+/// <summary>
+/// Moves the edited group's vector mask: the polygon follows the cursor by the same delta the cursor
+/// travels in the group's content space. The editing session records the whole edit as one undo entry
+/// when the mode is left, so the drag records nothing of its own.
+/// </summary>
+internal sealed class MaskMoveDrag : IPointerDrag
+{
+	private readonly PreviewCanvas canvas;
+	private readonly GroupElement group;
+	private readonly SKPoint[] startVertices;
+	private readonly SKPoint startCursor;
+
+	public MaskMoveDrag(PreviewCanvas canvas, GroupElement group, SKPoint documentCursor)
+	{
+		this.canvas = canvas;
+		this.group = group;
+		startVertices = group.Mask?.ToArray() ?? [];
+		startCursor = group.ToLocal(documentCursor);
+	}
+
+	public Cursor Cursor => CanvasCursors.Move;
+
+	public void Move(Point position, PointerEventArgs e)
+	{
+		var document = canvas.Document;
+		if (document is null || group.Mask is not { } vertices)
+			return;
+
+		var cursor = group.ToLocal(canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document)));
+		if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+			cursor = cursor.Snap();
+
+		var delta = cursor - startCursor;
+		for (var i = 0; i < vertices.Count; i++)
+			vertices[i] = startVertices[i] + delta;
+		document.RaiseChanged();
+	}
+
+	public void Release(Point position)
+	{
+	}
+}
+
+/// <summary>
+/// Drags one vertex of the edited group's vector mask to the cursor in the group's content space, which
+/// also absorbs the vertex a double-click on an edge just inserted: that insertion hands its index here.
+/// Like the mask move drag, this records nothing — the editing session owns the undo entry.
+/// </summary>
+internal sealed class MaskVertexDrag : IPointerDrag
+{
+	private readonly PreviewCanvas canvas;
+	private readonly GroupElement group;
+	private readonly int index;
+
+	public MaskVertexDrag(PreviewCanvas canvas, int index)
+	{
+		this.canvas = canvas;
+		group = canvas.MaskEditGroup!;
+		this.index = index;
+	}
+
+	public Cursor Cursor => CanvasCursors.Move;
+
+	public void Move(Point position, PointerEventArgs e)
+	{
+		var document = canvas.Document;
+		if (document is null || group.Mask is not { } vertices || index >= vertices.Count)
+			return;
+
+		var cursor = group.ToLocal(canvas.Viewport.ScreenToDocument(position, canvas.GetImageRect(document)));
+		if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+			cursor = cursor.Snap();
+
+		vertices[index] = cursor;
+		document.RaiseChanged();
+	}
+
+	public void Release(Point position)
+	{
 	}
 }

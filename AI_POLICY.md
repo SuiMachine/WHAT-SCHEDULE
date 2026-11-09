@@ -32,6 +32,7 @@ The following are **strictly prohibited**:
 
 - **No AI-generated images, artwork, illustrations, icons, logos, or other visual media may be added to this repository.**
 - Any assets committed to this repository must have been created by a human, with a clearly documented origin and license permitting their use in this project. **You are not allowed to use AI to edit those assets unless the license attached to the asset says otherwise.**
+- **The `Source/Assets` directory is off-limits to AI tools.** Beyond the rules above: AI must not create, edit, rename, convert, re-encode, "optimize", or delete any file in `Source/Assets`, even human-created ones, and must not stage or commit changes to files in that directory. Referencing existing assets from code or XAML (e.g. setting an icon path, loading an asset at runtime) is fine — the restriction applies to the asset files themselves, not to code that uses them.
 
 ### 3.2 Merge Requests Must Be Written by Hand
 
@@ -89,6 +90,7 @@ If you notice a contribution that appears to violate this policy, raise it with 
 | Topic | Rule |
 |---|---|
 | AI-generated images | **Prohibited.** Only human-created assets only due to legal swamp this area is. |
+| The `Source/Assets` directory | **Off-limits to AI.** No creating, editing, or committing asset files; referencing them from code is fine. |
 | Merge request titles/comments | **Must be hand-written** by a human. |
 | AI rewriting third-party code to avoid credit | **Prohibited.** Always moral and transparent. |
 | Third-party code use | Credit the source, respect its license. |

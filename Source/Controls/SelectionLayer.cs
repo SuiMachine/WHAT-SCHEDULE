@@ -50,7 +50,8 @@ internal sealed class SelectionLayer
 	public Corner? HitTestHandle(Point position, Rect imageRect, double scale)
 	{
 		var element = SelectedElement;
-		if (element is null)
+		//A locked element offers no handles, because none of them can be dragged.
+		if (element is null || element.IsLocked)
 			return null;
 
 		var bounds = element.ContentBounds;
@@ -69,7 +70,7 @@ internal sealed class SelectionLayer
 	public bool HitTestRotateHandle(Point position, Rect imageRect, double scale)
 	{
 		var element = SelectedElement;
-		if (element is null)
+		if (element is null || element.IsLocked)
 			return false;
 
 		var screen = ToScreen(GetRotateHandle(element, scale), imageRect, scale);
@@ -80,7 +81,8 @@ internal sealed class SelectionLayer
 	/// <summary>The selection box edge <paramref name="position"/> is over, within the handle hit radius; only image elements have a crop to drag.</summary>
 	public Edge? HitTestEdge(Point position, Rect imageRect, double scale)
 	{
-		if (SelectedElement is not ImageElement)
+		//Locking an image hides its crop handles along with the rest, since none can be dragged.
+		if (SelectedElement is not ImageElement image || image.IsLocked)
 			return null;
 
 		var bounds = SelectedElement.Bounds;
@@ -185,7 +187,7 @@ internal sealed class SelectionLayer
 			ctx.LineTo(ToScreen(element.ToDocument(GetCorner(bounds, Corner.BottomLeft)), imageRect, scale));
 			ctx.EndFigure(true);
 		}
-		context.DrawGeometry(null, ThemeDefinition.SelectionPen, box);
+		context.DrawGeometry(null, SelectedElement.IsLocked ? ThemeDefinition.SelectionPenLocked : ThemeDefinition.SelectionPen, box);
 
 		//While Alt is held (or a crop drag runs), the dashed box shows the whole bitmap the crop hides.
 		if (ShowCropBounds && element is ImageElement image)
@@ -202,6 +204,24 @@ internal sealed class SelectionLayer
 			}
 			context.DrawGeometry(null, ThemeDefinition.CropBoundsPen, cropBounds);
 		}
+
+		//A dashed loop shows where a selected group's vector mask clips its children.
+		if (element is GroupElement { Mask: { Count: >= 2 } maskVertices })
+		{
+			var maskBounds = new StreamGeometry();
+			using (var ctx = maskBounds.Open())
+			{
+				ctx.BeginFigure(ToScreen(element.ToDocument(maskVertices[0]), imageRect, scale), true);
+				for (var i = 1; i < maskVertices.Count; i++)
+					ctx.LineTo(ToScreen(element.ToDocument(maskVertices[i]), imageRect, scale));
+				ctx.EndFigure(true);
+			}
+			context.DrawGeometry(null, ThemeDefinition.CropBoundsPen, maskBounds);
+		}
+
+		//A locked element shows its box, but none of its handles: nothing can be dragged from them, so none is offered.
+		if (element.IsLocked)
+			return;
 
 		var half = ThemeDefinition.HandleSize / 2;
 		foreach (var corner in AllCorners)

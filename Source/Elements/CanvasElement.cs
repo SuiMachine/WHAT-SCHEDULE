@@ -35,6 +35,10 @@ public abstract class CanvasElement
 	/// <summary>The single schedule tag assigned to this element, or null when it has none; toggling is enforced by <see cref="WhatSchedule.Documents.Document.ToggleTagTracked"/>.</summary>
 	public ScheduleTag? Tag { get; set; }
 
+	/// <summary>Whether the element refuses to be moved, scaled, rotated or cropped directly on the canvas; a group
+	/// still carries its locked children with its own transform, and the hierarchy view's row menu sets the lock.</summary>
+	public bool IsLocked { get; set; }
+
 	/// <summary>The element's name as shown in the hierarchy list; the user-given name, the kind by default.</summary>
 	public virtual string DisplayName => Name ?? Kind;
 
@@ -246,6 +250,9 @@ public abstract class CanvasElement
 
 		/// <summary>The element's schedule tag in its serialized form, e.g. "Monday:Streaming"; null when it has none. Stays a list so files saved by older versions load unchanged.</summary>
 		public List<string>? Tags { get; set; }
+
+		/// <summary>Whether the element is locked against direct canvas manipulation; null (absent) when it is not, so files saved by older versions load unchanged.</summary>
+		public bool? IsLocked { get; set; }
 
 		/// <summary>The element's local position in its parent's content space.</summary>
 		public PointData Position { get; set; } = new();

@@ -17,9 +17,23 @@
                     IsColorPaletteVisible="True"
                     IsAccentColorsVisible="True" />
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-            <Button Content="Cancel" Click="OnCancelClick" Width="80" IsCancel="True"/>
-            <Button Content="OK" Click="OnOkClick" Width="80" IsDefault="True"/>
-        </StackPanel>
+        <Grid ColumnDefinitions="*,Auto,Auto">
+            <Button Grid.Column="0"
+                    Content="Sample Color"
+                    Click="OnSampleClick"
+                    HorizontalAlignment="Left" />
+            <Button Grid.Column="1"
+                    Content="Cancel"
+                    Click="OnCancelClick"
+                    Width="80"
+                    Margin="8,0,0,0"
+                    IsCancel="True" />
+            <Button Grid.Column="2"
+                    Content="OK"
+                    Click="OnOkClick"
+                    Width="80"
+                    Margin="8,0,0,0"
+                    IsDefault="True" />
+        </Grid>
     </StackPanel>
 </Window>

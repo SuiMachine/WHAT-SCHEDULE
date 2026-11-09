@@ -6,7 +6,7 @@ namespace WhatSchedule.Controls.Dialogs
 {
 	public sealed class ConfirmationDialog : Window
 	{
-		private ConfirmationDialog(string title, string message, string confirmText)
+		private ConfirmationDialog(string title, string message, string confirmText, bool showCancel)
 		{
 			Title = title;
 			WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -16,10 +16,22 @@ namespace WhatSchedule.Controls.Dialogs
 			MinWidth = 360;
 			Background = ThemeDefinition.Background;
 
-			var cancelButton = new Button { Content = "Cancel", IsCancel = true };
 			var confirmButton = new Button { Content = confirmText, IsDefault = true };
-			cancelButton.Click += (_, _) => Close(false);
 			confirmButton.Click += (_, _) => Close(true);
+
+			var buttons = new StackPanel
+			{
+				Orientation = Orientation.Horizontal,
+				Spacing = 8,
+				HorizontalAlignment = HorizontalAlignment.Right,
+			};
+			if (showCancel)
+			{
+				var cancelButton = new Button { Content = "Cancel", IsCancel = true };
+				cancelButton.Click += (_, _) => Close(false);
+				buttons.Children.Add(cancelButton);
+			}
+			buttons.Children.Add(confirmButton);
 
 			Content = new StackPanel
 			{
@@ -28,13 +40,7 @@ namespace WhatSchedule.Controls.Dialogs
 				Children =
 				{
 					new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, Width = 320 },
-					new StackPanel
-					{
-						Orientation = Orientation.Horizontal,
-						Spacing = 8,
-						HorizontalAlignment = HorizontalAlignment.Right,
-						Children = { cancelButton, confirmButton },
-					},
+					buttons,
 				},
 			};
 		}
@@ -42,8 +48,15 @@ namespace WhatSchedule.Controls.Dialogs
 		/// <summary>Asks the user to confirm an action; returns true only when the user confirms it.</summary>
 		public static async Task<bool> ShowDialog(Window owner, string title, string message, string confirmText)
 		{
-			var dialog = new ConfirmationDialog(title, message, confirmText);
+			var dialog = new ConfirmationDialog(title, message, confirmText, showCancel: true);
 			return await dialog.ShowDialog<bool>(owner);
+		}
+
+		/// <summary>Shows a message the user can only acknowledge.</summary>
+		public static async Task ShowMessage(Window owner, string title, string message)
+		{
+			var dialog = new ConfirmationDialog(title, message, "OK", showCancel: false);
+			_ = await dialog.ShowDialog<bool>(owner);
 		}
 	}
 }

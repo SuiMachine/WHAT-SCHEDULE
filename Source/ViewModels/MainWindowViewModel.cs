@@ -1,3 +1,4 @@
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -63,7 +64,7 @@ public partial class MainWindowViewModel : ObservableObject
 			return;
 
 		var bitmap = SKBitmap.Decode(await file[0].OpenReadAsync());
-		if(bitmap is null)
+		if (bitmap is null)
 			return;
 
 		Document.PrepareNewWithBackground(bitmap);
@@ -178,39 +179,179 @@ public partial class MainWindowViewModel : ObservableObject
 		RedoHeader = Document.History.RedoDescription is { } redoDescription ? $"Redo {redoDescription}" : "Redo";
 	}
 
-	private Document CreateSampleDocument()
+	private static Document CreateSampleDocument()
 	{
-		var document = new Document { Background = CreateSampleBackground() };
-		document.Add(new LabelElement
+		//I have created this by hand from Photoshop project
+		//because I wrote the rules that no assets can be read directly by AI
+		//- Sui
+		var document = new Document { Background = LoadExampleInternalAsset("background.png") };
+		document.Week.DateCulture = ScheduleDateCulture.EnUs;
+
+		//Might not work on Linux? We'll see.
+		(string Suffix, string Zone)[] defaultConversions =
+		[
+			("UTC", "UTC"),
+			("KST", "Asia/Seoul"),
+			("JST", "Asia/Tokyo"),
+			("WIB", "Asia/Jakarta"),
+			("MSK", "Europe/Moscow"),
+			("CET", "Europe/Berlin"),
+			("GMT", "Europe/London"),
+			("ET", "America/New_York"),
+			("CT", "America/Chicago"),
+			("PT", "America/Los_Angeles"),
+		];
+		foreach (var (suffix, zone) in defaultConversions)
+			document.Week.Conversions.Add(new ScheduleZoneConversion { Suffix = suffix, TimeZoneId = zone });
+
+		document.Add(new ImageElement(LoadExampleInternalAsset("background_outline.png"), new SKPoint() { X = 0, Y = 0 })
 		{
-			Text = OverlayText,
-			FontSize = 56f,
-			OutlineWidth = 3f,
-			ShadowColor = SKColors.Black.WithAlpha(160),
-			ShadowBlur = 8f,
-			ShadowOffset = new SKPoint(4f, 4f),
-			Position = new SKPoint(24f, 24f),
+			Name = "Background outline",
+			BlendMode = SKBlendMode.Difference,
+			IsLocked = true
 		});
+		document.AddGuide(new Guide() { IsHorizontal = true, Position = 145 });
+		document.AddGuide(new Guide() { IsHorizontal = true, Position = 540 });
+		document.AddGuide(new Guide() { IsHorizontal = true, Position = 998 });
+		document.AddGuide(new Guide() { IsHorizontal = false, Position = 730 });
+		document.AddGuide(new Guide() { IsHorizontal = false, Position = 960 });
+		document.AddGuide(new Guide() { IsHorizontal = false, Position = 1678 });
+		document.AddGuide(new Guide() { IsHorizontal = false, Position = 1836 });
+
+		var artSection = new GroupElement()
+		{
+			Document = document,
+			Name = "Art section",
+			IsLocked = true
+		};
+		artSection.InsertChild(new ImageElement(LoadExampleInternalAsset("art_outline.png"), new SKPoint() { X = -278, Y = -423 }) { IsLocked = true }, 0);
+		artSection.Position = new SKPoint(350, 501);
+
+		var userArtCrop = new GroupElement()
+		{
+			Document = document,
+			Name = "User art crop",
+			IsLocked = true,
+			Mask = new List<SKPoint>()
+			{
+				new SKPoint(-297, -431), //left upper corner
+				new SKPoint(-216, -431),
+				new SKPoint(-194, -454),
+				new SKPoint(194, -454),
+				new SKPoint(216, -431),
+				new SKPoint(297, -431),
+
+				//Mirror through Y
+				new SKPoint(297, 431),
+				new SKPoint(216, 431),
+				new SKPoint(194, 454),
+				new SKPoint(-194, 454),
+				new SKPoint(-216, 431),
+				new SKPoint(-297, 431)
+			}
+		};
+		userArtCrop.InsertChild(new ImageElement(LoadExampleInternalAsset("art_temporary.png"), new SKPoint() { X = -288, Y = -445 }) { Name = "User art" }, 0);
+		userArtCrop.Position = new SKPoint(36, 36);
+		artSection.InsertChild(userArtCrop, 0);
+		document.Add(artSection);
+
+		//But I got a bit clever here
+		int startPositionX = 1270;
+		int startPositionY = 148;
+
+		int shuffleX = 28;
+		int stepY = 131;
+		int counter = 0;
+
+		var dayOfWeekBackground = LoadExampleInternalAsset("element_bg.png");
+		var dayOfWeekBackgroundOutline = LoadExampleInternalAsset("outline.png");
+		var dayOfWeekDetailLeft = LoadExampleInternalAsset("active_day_left.png");
+		var dayOfWeekDetailRight = LoadExampleInternalAsset("active_day_right.png");
+
+		foreach (ScheduleDay dayOfTheWeek in Enum.GetValues<ScheduleDay>())
+		{
+			var dayGroup = new GroupElement()
+			{
+				Document = document,
+				Name = dayOfTheWeek.ToString(),
+			};
+
+			dayGroup.InsertChild(new ImageElement(dayOfWeekBackgroundOutline, new SKPoint(-542, -59)) { Name = "Outline" }, 0);
+			dayGroup.InsertChild(new ImageElement(dayOfWeekBackground, new SKPoint(-543, -59)) { BlendMode = SKBlendMode.Hue, Name = "Background" }, 0);
+			dayGroup.InsertChild(new ImageElement(dayOfWeekDetailLeft, new SKPoint(-540, -55)) { Name = "DetailLeft" }, 2);
+			dayGroup.InsertChild(new ImageElement(dayOfWeekDetailRight, new SKPoint(416, -55)) { Name = "DetailRight" }, 3);
+			dayGroup.InsertChild(new LabelElement()
+			{
+				Text = $"{{{ScheduleVariables.DateName(dayOfTheWeek)}}}",
+				Position = new SKPoint(-537, -54),
+				Width = 124,
+				Height = 112,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 38
+			}, 4);
+
+			dayGroup.InsertChild(new LabelElement()
+			{
+				Text = $"CET:",
+				Position = new SKPoint(403, -60),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
+			}, 4);
+			dayGroup.InsertChild(new LabelElement()
+			{
+				Text = $"{{{ScheduleVariables.TimeName(dayOfTheWeek)}}}",
+				Position = new SKPoint(423, -32),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
+			}, 4);
+
+			dayGroup.InsertChild(new LabelElement()
+			{
+				Text = $"WIB:",
+				Position = new SKPoint(423, 0),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
+			}, 4);
+			dayGroup.InsertChild(new LabelElement()
+			{
+				Text = $"{{{ScheduleVariables.ConvertedTimeName(dayOfTheWeek, "WIB")}}}",
+				Position = new SKPoint(403, 26),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
+			}, 4);
+
+			int dayOfWeekPosition = counter % 2 == 0 ? startPositionX : startPositionX + shuffleX;
+			dayGroup.Position = new SKPoint(dayOfWeekPosition, startPositionY);
+			document.Add(dayGroup);
+
+			startPositionY += stepY;
+			counter++;
+		}
+
 		return document;
 	}
 
-	private static SKBitmap CreateSampleBackground()
+	private static SKBitmap LoadExampleInternalAsset(string asset)
 	{
-		const int width = 1920;
-		const int height = 1080;
-
-		var bitmap = new SKBitmap(width, height);
-		using var canvas = new SKCanvas(bitmap);
-		using var paint = new SKPaint
-		{
-			Shader = SKShader.CreateLinearGradient(
-				new SKPoint(0, 0),
-				new SKPoint(width, height),
-				new[] { new SKColor(0x1E, 0x3A, 0x8A), new SKColor(0x9A, 0x3D, 0x8F) },
-				null,
-				SKShaderTileMode.Clamp),
-		};
-		canvas.DrawRect(0, 0, width, height, paint);
-		return bitmap;
+		using var stream = AssetLoader.Open(new Uri($"avares://WhatSchedule/Assets/Example/{asset}"));
+		return SKBitmap.Decode(stream);
 	}
 }

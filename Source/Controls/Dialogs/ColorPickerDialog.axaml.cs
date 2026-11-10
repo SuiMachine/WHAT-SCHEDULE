@@ -20,6 +20,11 @@ namespace WhatSchedule.Controls.Dialogs
 	/// </summary>
 	public partial class ColorPickerDialog : Window
 	{
+		public ColorPickerDialog()
+		{
+			InitializeComponent();
+		}
+
 		private ColorPickerDialog(SKColor initialColor)
 		{
 			InitializeComponent();

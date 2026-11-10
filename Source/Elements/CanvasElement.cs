@@ -189,24 +189,24 @@ public abstract class CanvasElement
 		return ContentBounds.Contains(local.X, local.Y);
 	}
 
-	/// <summary>Draws the element onto the document; the canvas state is the element's parent content space. The activity <paramref name="filter"/> hides the element (see <see cref="PassesFilter"/>).</summary>
-	public abstract void Draw(SKCanvas canvas, ScheduleActivity? filter);
+	/// <summary>Draws the element onto the document; the canvas state is the element's parent content space. The display <paramref name="filter"/> hides the element (see <see cref="PassesFilter"/>).</summary>
+	public abstract void Draw(SKCanvas canvas, TagFilter? filter);
 
-	/// <summary>Whether the element is displayed under the activity <paramref name="filter"/>: always when unfiltered, otherwise when its own tag matches, else when it is a group holding a displayed descendant.</summary>
-	internal bool PassesFilter(ScheduleActivity? filter)
+	/// <summary>Whether the element is displayed under the display <paramref name="filter"/>: unfiltered and untagged elements always show; a tagged element unless the filter hides its activity on its day.</summary>
+	internal bool PassesFilter(TagFilter? filter)
 	{
-		if (filter is null || Tag?.Activity == filter)
+		if (filter is null || Tag is not { } tag)
 			return true;
 
-		return this is GroupElement group && group.Children.Any(child => child.PassesFilter(filter));
+		return !filter.IsHidden(tag);
 	}
 
-	/// <summary>The filter the element's children render under: none when the element's own tag matches the filter, since then its whole content shows.</summary>
-	internal ScheduleActivity? ChildFilter(ScheduleActivity? filter) => filter is not null && Tag?.Activity == filter ? null : filter;
+	/// <summary>The filter the element's children render under: none when the element carries a tag itself, since a tagged container claims its whole content for that tag's variant.</summary>
+	internal TagFilter? ChildFilter(TagFilter? filter) => Tag is null ? filter : null;
 
 	/// <summary>Whether the element is displayed under the activity <paramref name="filter"/>: a hidden element is
 	/// never drawn and never picked on the canvas, and neither is a group's content while the group stays hidden.</summary>
-	internal bool IsDisplayed(ScheduleActivity? filter) => !IsHidden && PassesFilter(filter);
+	internal bool IsDisplayed(TagFilter? filter) => !IsHidden && PassesFilter(filter);
 
 	/// <summary>
 	/// State of an element captured when a scale drag starts, so every drag step can be

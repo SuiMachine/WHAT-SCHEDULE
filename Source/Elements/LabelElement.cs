@@ -150,7 +150,7 @@ public sealed class LabelElement : CanvasElement
 		}
 	}
 
-	public override void Draw(SKCanvas canvas, ScheduleActivity? filter)
+	public override void Draw(SKCanvas canvas, TagFilter? filter)
 	{
 		var bounds = Bounds;
 		var count = canvas.Save();

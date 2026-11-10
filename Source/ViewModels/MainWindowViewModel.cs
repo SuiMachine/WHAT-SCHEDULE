@@ -278,19 +278,82 @@ public partial class MainWindowViewModel : ObservableObject
 
 			dayGroup.InsertChild(new ImageElement(dayOfWeekBackgroundOutline, new SKPoint(-542, -59)) { Name = "Outline" }, 0);
 			dayGroup.InsertChild(new ImageElement(dayOfWeekBackground, new SKPoint(-543, -59)) { BlendMode = SKBlendMode.Hue, Name = "Background" }, 0);
-			dayGroup.InsertChild(new ImageElement(dayOfWeekDetailLeft, new SKPoint(-540, -55)) { Name = "DetailLeft" }, 2);
-			dayGroup.InsertChild(new ImageElement(dayOfWeekDetailRight, new SKPoint(416, -55)) { Name = "DetailRight" }, 3);
-			dayGroup.InsertChild(new LabelElement()
+
+			var dateGroup = new GroupElement()
+			{
+				Document = document,
+				Name = "Date Group"
+			};
+			dateGroup.InsertChild(new LabelElement()
 			{
 				Text = $"{{{ScheduleVariables.DateName(dayOfTheWeek)}}}",
-				Position = new SKPoint(-537, -54),
+				Position = new SKPoint(-60, -55),
 				Width = 124,
 				Height = 112,
 				Alignment = Rendering.Definitions.TextAlignment.Center,
 				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
 				FontFamily = "Impact",
 				FontSize = 38
+			}, 0);
+			dateGroup.InsertChild(new ImageElement(dayOfWeekDetailLeft, new SKPoint(-63, -56)) { Name = "DetailLeft" }, 0);
+			dayGroup.InsertChild(dateGroup, 2);
+			dateGroup.Position = new SKPoint(-476, 1);
+
+			var timesGroup = new GroupElement()
+			{
+				Document = document,
+				Name = "Times Group",
+				Tag = new ScheduleTag(dayOfTheWeek, ScheduleActivity.Streaming)
+			};
+			timesGroup.InsertChild(new ImageElement(dayOfWeekDetailRight, new SKPoint(-59, -55)) { Name = "DetailRight" }, 0);
+			timesGroup.InsertChild(new LabelElement()
+			{
+				Text = $"CET:",
+				Position = new SKPoint(-72, -60),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
+			}, 1);
+			timesGroup.InsertChild(new LabelElement()
+			{
+				Text = $"{{{ScheduleVariables.TimeName(dayOfTheWeek)}}}",
+				Position = new SKPoint(-52, -32),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
+			}, 2);
+
+			timesGroup.InsertChild(new LabelElement()
+			{
+				Text = $"WIB:",
+				Position = new SKPoint(-52, 0),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
+			}, 3);
+			timesGroup.InsertChild(new LabelElement()
+			{
+				Text = $"{{{ScheduleVariables.ConvertedTimeName(dayOfTheWeek, "WIB")}}}",
+				Position = new SKPoint(-72, 26),
+				Width = 124,
+				Height = 34,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 24
 			}, 4);
+			dayGroup.InsertChild(timesGroup, 2);
+			timesGroup.Position = new SKPoint(474, 0);
+
 			dayGroup.InsertChild(new LabelElement()
 			{
 				Text = $"{{{ScheduleVariables.TitleName(dayOfTheWeek)}}}",
@@ -301,53 +364,7 @@ public partial class MainWindowViewModel : ObservableObject
 				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
 				FontFamily = "Impact",
 				FontSize = 38
-			}, 4);
-
-			dayGroup.InsertChild(new LabelElement()
-			{
-				Text = $"CET:",
-				Position = new SKPoint(403, -60),
-				Width = 124,
-				Height = 34,
-				Alignment = Rendering.Definitions.TextAlignment.Center,
-				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
-				FontFamily = "Impact",
-				FontSize = 24
-			}, 4);
-			dayGroup.InsertChild(new LabelElement()
-			{
-				Text = $"{{{ScheduleVariables.TimeName(dayOfTheWeek)}}}",
-				Position = new SKPoint(423, -32),
-				Width = 124,
-				Height = 34,
-				Alignment = Rendering.Definitions.TextAlignment.Center,
-				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
-				FontFamily = "Impact",
-				FontSize = 24
-			}, 4);
-
-			dayGroup.InsertChild(new LabelElement()
-			{
-				Text = $"WIB:",
-				Position = new SKPoint(423, 0),
-				Width = 124,
-				Height = 34,
-				Alignment = Rendering.Definitions.TextAlignment.Center,
-				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
-				FontFamily = "Impact",
-				FontSize = 24
-			}, 4);
-			dayGroup.InsertChild(new LabelElement()
-			{
-				Text = $"{{{ScheduleVariables.ConvertedTimeName(dayOfTheWeek, "WIB")}}}",
-				Position = new SKPoint(403, 26),
-				Width = 124,
-				Height = 34,
-				Alignment = Rendering.Definitions.TextAlignment.Center,
-				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
-				FontFamily = "Impact",
-				FontSize = 24
-			}, 4);
+			}, 2);
 
 			int dayOfWeekPosition = counter % 2 == 0 ? startPositionX : startPositionX + shuffleX;
 			dayGroup.Position = new SKPoint(dayOfWeekPosition, startPositionY);

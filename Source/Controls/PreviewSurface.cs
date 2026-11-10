@@ -39,8 +39,8 @@ internal sealed class PreviewSurface : IDisposable
 		return true;
 	}
 
-	/// <summary>Re-renders the document into the bitmap if anything changed since the last render. The activity filter hides elements whose tag names another activity.</summary>
-	public void Render(Document document, ScheduleActivity? filter)
+	/// <summary>Re-renders the document into the bitmap if anything changed since the last render. The display filter keeps the tagged elements it hides out of the bitmap.</summary>
+	public void Render(Document document, TagFilter? filter)
 	{
 		if (!dirty || bitmap is null)
 			return;

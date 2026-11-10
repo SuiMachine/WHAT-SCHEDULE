@@ -54,18 +54,19 @@ public partial class MainWindow : Window
 
 	private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();
 
-	/// <summary>Applies the menu bar's activity filter to the canvas display; "None" clears it. Skipped during initialization, when the canvas is not bound yet.</summary>
+	/// <summary>Applies the menu bar's display filter to the canvas; "None" clears it. Skipped during initialization, when the canvas is not bound yet.</summary>
 	private void OnTagFilterChanged(object? sender, SelectionChangedEventArgs e)
 	{
 		//The XAML's SelectedIndex fires this while InitializeComponent is still loading, before the canvas field is assigned.
 		if (Canvas is null)
 			return;
 
-		Canvas.TagFilter = TagFilter.SelectedIndex switch
+		Canvas.DisplayFilter = TagFilter.SelectedIndex switch
 		{
-			1 => ScheduleActivity.Streaming,
-			2 => ScheduleActivity.TakingABreak,
-			_ => null
+			1 => ScheduleFilter.Streaming,
+			2 => ScheduleFilter.TakingABreak,
+			3 => ScheduleFilter.Final,
+			_ => ScheduleFilter.None
 		};
 	}
 

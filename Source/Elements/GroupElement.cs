@@ -88,8 +88,8 @@ public sealed class GroupElement : CanvasElement
 
 	/// <summary>Draws the children inside the group's transform, clipped to the vector mask polygon when one is
 	/// set; the canvas state is the parent's content space. Only displayed children are drawn: hidden ones and
-	/// those failing the activity filter stay out.</summary>
-	public override void Draw(SKCanvas canvas, ScheduleActivity? filter)
+	/// those failing the display filter stay out.</summary>
+	public override void Draw(SKCanvas canvas, TagFilter? filter)
 	{
 		var count = canvas.Save();
 		canvas.Translate(Position.X, Position.Y);

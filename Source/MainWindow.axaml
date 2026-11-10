@@ -139,8 +139,9 @@
 				<ComboBox x:Name="TagFilter" Margin="0,2,12,2" VerticalAlignment="Center"
 						  SelectedIndex="0" SelectionChanged="OnTagFilterChanged">
 					<ComboBoxItem Content="None" />
-					<ComboBoxItem Content="Streaming only" />
-					<ComboBoxItem Content="Taking a break only" />
+					<ComboBoxItem Content="Streaming" />
+					<ComboBoxItem Content="Taking a break" />
+					<ComboBoxItem Content="Final" />
 				</ComboBox>
 			</StackPanel>
 			<NativeMenuBar />

@@ -26,8 +26,8 @@ public static class DocumentRenderer
 		return bitmap;
 	}
 
-	/// <summary>Renders the document onto an existing canvas, clearing it first. The activity <paramref name="filter"/> is a display concern of the canvas preview; exports pass null to render everything.</summary>
-	public static void Render(Document document, SKCanvas canvas, ScheduleActivity? filter = null)
+	/// <summary>Renders the document onto an existing canvas, clearing it first. The display <paramref name="filter"/> is a concern of the canvas preview; exports pass null to render everything.</summary>
+	public static void Render(Document document, SKCanvas canvas, TagFilter? filter = null)
 	{
 		ArgumentNullException.ThrowIfNull(document);
 		ArgumentNullException.ThrowIfNull(canvas);

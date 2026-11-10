@@ -43,27 +43,39 @@ public class PreviewCanvas : Control, IDisposable
 
 	internal Rect GetImageRect(Document document) => Viewport.GetImageRect(ContentRect, new Size(document.Width, document.Height));
 
-	private ScheduleActivity? tagFilter;
+	private ScheduleFilter displayFilter;
 
 	/// <summary>
-	/// The activity filter of the canvas display: null shows everything, an activity only the elements tagged with it
-	/// (and the groups holding one). Display-only: exports render the whole document.
+	/// The display filter chosen in the menu: "Streaming" and "Taking a break" keep one activity's elements
+	/// out, "Final" keeps out what the week's plan doesn't use on each day (see <see cref="ScheduleFilter"/>),
+	/// "None" shows everything. Display-only: exports render the whole document.
 	/// </summary>
-	public ScheduleActivity? TagFilter
+	public ScheduleFilter DisplayFilter
 	{
-		get => tagFilter;
+		get => displayFilter;
 		set
 		{
-			if (tagFilter == value)
+			if (displayFilter == value)
 				return;
 
-			tagFilter = value;
-			if (Selection.SelectedElement is { } selected && !selected.PassesFilter(value))
+			displayFilter = value;
+			if (Selection.SelectedElement is { } selected && !selected.PassesFilter(ResolveDisplayFilter()))
 				Selection.SelectedElement = null;
 			Surface.MarkDirty();
 			InvalidateVisual();
 		}
 	}
+
+	/// <summary>The display filter resolved against the current document: the "Streaming" and "Taking a break"
+	/// choices need none, "Final" is built from the week's streaming flags on every call so it follows the edit
+	/// schedule window, and without a document nothing can be filtered anyway.</summary>
+	private TagFilter? ResolveDisplayFilter() => displayFilter switch
+	{
+		ScheduleFilter.Streaming => TagFilter.Streaming,
+		ScheduleFilter.TakingABreak => TagFilter.TakingABreak,
+		ScheduleFilter.Final when Document is { } document => TagFilter.FromWeek(document.Week),
+		_ => null
+	};
 
 	private IPointerDrag? activeDrag;
 
@@ -160,7 +172,7 @@ public class PreviewCanvas : Control, IDisposable
 		//The sampling owns the pointer alone: a mask edit session still open settles as its own undo entry first.
 		EndMaskEdit();
 		//The loupe shows the pixels the click will sample, so they are rendered up to date and then frozen.
-		Surface.Render(document, tagFilter);
+		Surface.Render(document, ResolveDisplayFilter());
 		samplePixels = Surface.SnapshotPixels();
 		samplePosition = null;
 		colorSample = new TaskCompletionSource<SKColor?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -905,17 +917,18 @@ public class PreviewCanvas : Control, IDisposable
 			return null;
 
 		var point = Viewport.ScreenToDocument(position, GetImageRect(document));
+		var filter = ResolveDisplayFilter();
 		for (var i = document.RootElements.Count - 1; i >= 0; i--)
 		{
-			if (document.RootElements[i].PassesFilter(tagFilter) && HitTest(document.RootElements[i], point, tagFilter) is { } element)
+			if (document.RootElements[i].PassesFilter(filter) && HitTest(document.RootElements[i], point, filter) is { } element)
 				return element;
 		}
 
 		return null;
 	}
 
-	/// <summary>The topmost element at <paramref name="point"/> (in document pixels) passing the activity <paramref name="filter"/>: a group's children are hit first, and the empty space inside a group's frame picks the group itself.</summary>
-	private static CanvasElement? HitTest(CanvasElement element, SKPoint point, ScheduleActivity? filter)
+	/// <summary>The topmost element at <paramref name="point"/> (in document pixels) passing the display <paramref name="filter"/>: a group's children are hit first, and the empty space inside a group's frame picks the group itself.</summary>
+	private static CanvasElement? HitTest(CanvasElement element, SKPoint point, TagFilter? filter)
 	{
 		if (element is GroupElement group)
 		{
@@ -971,7 +984,7 @@ public class PreviewCanvas : Control, IDisposable
 			Viewport.ResetFit();
 
 		Viewport.TryInitialFit(ContentRect, new Size(document.Width, document.Height));
-		Surface.Render(document, tagFilter);
+		Surface.Render(document, ResolveDisplayFilter());
 
 		var imageRect = GetImageRect(document);
 		context.DrawImage(Surface.Bitmap!, imageRect);

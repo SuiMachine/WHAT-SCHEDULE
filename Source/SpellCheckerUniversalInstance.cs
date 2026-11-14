@@ -14,7 +14,7 @@ namespace WhatSchedule
 					var directory = Path.Combine(AppContext.BaseDirectory, "Dictionaries");
 					if (Directory.Exists(directory))
 					{
-						var dicFiles = Directory.GetFiles(directory, "*.dic", SearchOption.AllDirectories); //unfortunance extension
+						var dicFiles = Directory.GetFiles(directory, "*.dic", SearchOption.AllDirectories); //unfortunate extension pick... at least it's not ass, I guess?
 						var affFiles = Directory.GetFiles(directory, "*.aff", SearchOption.AllDirectories);
 
 						var trimmedDics = dicFiles.Select(f => Path.GetFileNameWithoutExtension(f).ToLowerInvariant()).Distinct().ToArray();

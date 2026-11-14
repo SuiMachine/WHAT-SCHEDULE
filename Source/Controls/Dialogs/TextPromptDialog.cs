@@ -9,8 +9,6 @@ namespace WhatSchedule.Controls.Dialogs
 	public sealed class TextPromptDialog : Window
 	{
 		private readonly TextBox textBox;
-		private readonly TextBoxSpellChecker _spellChecker;
-
 		private TextPromptDialog(string title, string caption, string defaultText, Document? document)
 		{
 			Title = title;
@@ -27,8 +25,7 @@ namespace WhatSchedule.Controls.Dialogs
 				PlaceholderText = caption,
 				Width = 320,
 			};
-			_spellChecker = new TextBoxSpellChecker(SpellCheckerConfig.Create("en_US"));
-			_spellChecker.Initialize(textBox);
+			SpellCheckerUniversalInstance.Instance.Initialize(textBox);
 
 			var okButton = new Button { Content = "OK", IsDefault = true };
 			var cancelButton = new Button { Content = "Cancel", IsCancel = true };

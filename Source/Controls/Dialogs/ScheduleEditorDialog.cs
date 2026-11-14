@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.SpellChecker;
 using WhatSchedule.Documents;
 using WhatSchedule.Elements;
 
@@ -228,6 +229,8 @@ namespace WhatSchedule.Controls.Dialogs
 		{
 			var name = new TextBlock { Text = dayName, Margin = new Avalonia.Thickness(0, 6, 16, 6), VerticalAlignment = VerticalAlignment.Center };
 			var title = new TextBox { Text = entry.StreamTitle, PlaceholderText = "Stream title", Margin = new Avalonia.Thickness(0, 4, 16, 4) };
+			SpellCheckerUniversalInstance.Instance.Initialize(title);
+
 			var streaming = new CheckBox { IsChecked = entry.IsStreaming, Margin = new Avalonia.Thickness(0, 4, 16, 4), HorizontalAlignment = HorizontalAlignment.Center };
 			var time = new TimePicker { SelectedTime = (entry.StreamTime ?? DefaultStreamTime).ToTimeSpan(), Margin = new Avalonia.Thickness(0, 4, 0, 4) };
 

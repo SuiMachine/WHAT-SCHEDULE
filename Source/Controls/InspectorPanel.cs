@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.SpellChecker;
 using SkiaSharp;
 using System.Globalization;
 using WhatSchedule.Controls.Dialogs;
@@ -26,6 +27,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	private PreviewCanvas? canvas;
 	private CanvasElement? element;
 	private Grid rows = null!;
+	private readonly TextBoxSpellChecker m_SpellChecker;
 
 	/// <summary>Titles of the sections the user collapsed, kept across rebuilds so the choice sticks when the selection changes.</summary>
 	private readonly HashSet<string> collapsedSections = new(StringComparer.Ordinal);
@@ -34,6 +36,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	{
 		//The mask points open collapsed: their coordinates are fine-tuned by typing far less often than the mask is shaped by dragging.
 		collapsedSections.Add("Mask Points");
+		m_SpellChecker = new TextBoxSpellChecker(SpellCheckerConfig.Create("en_US"));
 	}
 
 	/// <summary>The editors of the section being built, hidden while its header is collapsed.</summary>
@@ -285,6 +288,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 	private void AddTextBox(string header, Func<string> get, Action<string> set)
 	{
 		var box = new TextBox();
+		m_SpellChecker.Initialize(box);
 
 		//Value changes that come from the sync refresh must not start an edit or commit anything.
 		var syncing = false;
@@ -359,6 +363,7 @@ public sealed class InspectorPanel : StackPanel, IInspectorBuilder
 			MaxHeight = 140,
 			VerticalContentAlignment = VerticalAlignment.Top,
 		};
+		m_SpellChecker.Initialize(box);
 
 		//Value changes that come from the sync refresh must not start an edit or commit anything.
 		var syncing = false;

@@ -10,6 +10,7 @@ This application targets Windows and Linux.
 
 ## Libraries used
 - [Avalonia (UI)](https://github.com/avaloniaui/avalonia)
+- [Avalonia Spell Checker](https://github.com/GustavoHennig/Avalonia.SpellChecker)
 - [SkiaSharp](https://github.com/mono/skiasharp)
 
 ## References used

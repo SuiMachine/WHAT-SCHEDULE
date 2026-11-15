@@ -6,6 +6,7 @@ using SkiaSharp;
 using WhatSchedule.Controls.Dialogs;
 using WhatSchedule.Documents;
 using WhatSchedule.Elements;
+using WhatSchedule.TwitchAPI;
 using WhatSchedule.ViewModels;
 
 namespace WhatSchedule;
@@ -124,6 +125,58 @@ public partial class MainWindow : Window
 		{
 			viewModel.Document.Week = edit.Week;
 			viewModel.Document.Variables = edit.Variables;
+			viewModel.Document.RaiseChanged();
+		}
+	}
+
+	private async void OnImportScheduleFromTwitchClick(object? sender, EventArgs e)
+	{
+		if (DataContext is not MainWindowViewModel viewModel)
+			return;
+
+		if (viewModel.Document.Week.WeekStart == null)
+			return;
+
+		var weekStart = viewModel.Document.Week.WeekStart.GetValueOrDefault();
+
+		if (!await ConfirmationDialog.ShowDialog(this, "Import schedule from Twitch...", $"Importing a schedule will delete current week information. Are you sure you want to continue?\n\nThe import will be for: {weekStart} - {weekStart.AddDays(6)}. If this is incorrect, edit week selection.", "Import"))
+			return;
+
+		var import = await TwitchScheduleImporter.ImportScheduleFromTwitchAsync(this, weekStart);
+		if (import != null && import.Length > 0)
+		{
+			foreach (var twitchStream in import)
+			{
+				var doc = viewModel.Document.Week.TimeZoneId;
+
+				if (doc == null)
+				{
+					twitchStream.start_time = twitchStream.start_time?.ToLocalTime();
+					twitchStream.end_time = twitchStream.end_time?.ToLocalTime();
+				}
+				else
+				{
+					twitchStream.start_time = TimeZoneInfo.ConvertTimeFromUtc(twitchStream.start_time.GetValueOrDefault().ToUniversalTime(), TimeZoneInfo.FindSystemTimeZoneById(doc));
+					twitchStream.end_time = TimeZoneInfo.ConvertTimeFromUtc(twitchStream.end_time.GetValueOrDefault().ToUniversalTime(), TimeZoneInfo.FindSystemTimeZoneById(doc));
+				}
+			}
+
+			viewModel.Document.History.Clear();
+			int dayOffset = 0;
+			foreach (var day in viewModel.Document.Week.Days)
+			{
+				var dayToCheck = weekStart.AddDays(dayOffset);
+				var find = import.FirstOrDefault(x => DateOnly.FromDateTime(x.start_time.GetValueOrDefault()) == dayToCheck);
+				if(find == null)
+					day.IsStreaming = false;
+				else
+				{
+					day.StreamTime = TimeOnly.FromDateTime(find.start_time.GetValueOrDefault());
+					day.StreamTitle = find.title ?? string.Empty;
+					day.IsStreaming = true;
+				}
+				dayOffset++;
+			}
 			viewModel.Document.RaiseChanged();
 		}
 	}

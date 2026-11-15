@@ -93,6 +93,7 @@
 					<NativeMenu>
 						<NativeMenuItem Header="Select Week..." Click="OnSelectWeekClick" />
 						<NativeMenuItem Header="Edit Schedule..." Click="OnEditScheduleClick" />
+						<NativeMenuItem Header="Import from Twitch..." Click="OnImportScheduleFromTwitchClick" />
 					</NativeMenu>
 				</NativeMenuItem.Menu>
 			</NativeMenuItem>

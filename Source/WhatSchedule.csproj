@@ -5,6 +5,14 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>CA1707</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn>CA1707</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Remove="Assets\Example\active_day_left.png" />
     <None Remove="Assets\Example\active_day_right.png" />

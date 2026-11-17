@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Sui_VT
+// Licensed under the GNU GPL v3.0 or later - see LICENSE.md or <https://www.gnu.org/licenses/>.
+
 // If there is a class that has too many summeries - it's this one
 // But it is an abstract base class, so I am willing to accept it - Sui
 using Avalonia.Input;

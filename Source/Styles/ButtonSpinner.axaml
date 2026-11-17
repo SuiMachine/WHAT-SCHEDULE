@@ -1,4 +1,9 @@
 <!--
+	Copyright (C) 2026 Sui_VT
+	Licensed under the GNU GPL v3.0 or later - see LICENSE.md or <https://www.gnu.org/licenses/>.
+-->
+
+<!--
 	Adapted from Avalonia's Fluent theme: src/Avalonia.Themes.Fluent/Controls/ButtonSpinner.xaml
 	(https://github.com/AvaloniaUI/Avalonia, MIT License, Copyright (c) AvaloniaUI contributors).
 	The only change: the spin buttons are swapped so the decrease button sits left of the increase button,

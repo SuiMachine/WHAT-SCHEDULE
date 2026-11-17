@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Sui_VT
+// Licensed under the GNU GPL v3.0 or later - see LICENSE.md or <https://www.gnu.org/licenses/>.
+
 using Avalonia.Controls;
 using SkiaSharp;
 

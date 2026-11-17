@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Sui_VT
+// Licensed under the GNU GPL v3.0 or later - see LICENSE.md or <https://www.gnu.org/licenses/>.
+
 namespace WhatSchedule.Elements;
 
 /// <summary>A day of the week a schedule tag can be assigned to.</summary>

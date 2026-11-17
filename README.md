@@ -1,5 +1,5 @@
 # WHAT SCHEDULE ?!
-A free, cross-platform desktop application that allows for generating and editing Stream schedules. This application uses [Avalonia UI](https://avaloniaui.net/), with image processing handled by [SkiaSharp](https://github.com/mono/SkiaSharp).
+A free, locally run, multi-platform program for handling stream schedule and generating PNGs for for them written in C#. This application uses [Avalonia UI](https://avaloniaui.net/), with image processing handled by [SkiaSharp](https://github.com/mono/SkiaSharp).
 
 This application targets Windows and Linux (To validate).
 

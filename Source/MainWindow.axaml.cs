@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using SkiaSharp;
+using System.Diagnostics;
 using WhatSchedule.Controls.Dialogs;
 using WhatSchedule.Documents;
 using WhatSchedule.Elements;
@@ -31,6 +32,17 @@ public partial class MainWindow : Window
 		base.OnOpened(e);
 		if (DataContext is MainWindowViewModel viewModel)
 			viewModel.StorageProvider = StorageProvider;
+
+		_ = ShowLegalNoticeOnFirstRunAsync();
+	}
+
+	private async Task ShowLegalNoticeOnFirstRunAsync()
+	{
+		if (FirstRunNotice.WasShown())
+			return;
+
+		await AboutDialog.ShowAsync(this);
+		FirstRunNotice.MarkShown();
 	}
 
 	//The window has no system title bar (WindowDecorations="BorderOnly"), so the custom one in MainWindow.axaml moves,
@@ -103,6 +115,17 @@ public partial class MainWindow : Window
 	}
 
 	private void OnExitClick(object? sender, EventArgs e) => Close();
+
+	private async void OnAboutClick(object? sender, EventArgs e) => await AboutDialog.ShowAsync(this);
+
+	private async void OnIssuesTrackerClick(object? sender, EventArgs e)
+	{
+		Process.Start(new ProcessStartInfo
+		{
+			FileName = "https://github.com/SuiMachine/WHAT-SCHEDULE/issues",
+			UseShellExecute = true
+		});
+	}	
 
 	//The picked week and its date culture land on the document, so the days' date variables follow the selection.
 	private async void OnSelectWeekClick(object? sender, EventArgs e)

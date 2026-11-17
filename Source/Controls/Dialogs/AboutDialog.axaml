@@ -1,0 +1,65 @@
+<!--
+	Copyright (C) 2026 Sui_VT
+	Licensed under the GNU GPL v3.0 or later - see LICENSE.md or <https://www.gnu.org/licenses/>.
+-->
+
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="clr-namespace:WhatSchedule"
+        x:Class="WhatSchedule.Controls.Dialogs.AboutDialog"
+        Title="About the program"
+        Width="480" Height="480"
+        MinWidth="440" MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        ShowInTaskbar="False"
+        Background="{x:Static app:ThemeDefinition.Background}">
+
+	<Window.Styles>
+		<!--Link-styled buttons underline their text while hovered.-->
+		<Style Selector="Button.link:pointerover /template/ ContentPresenter TextBlock">
+			<Setter Property="TextBlock.TextDecorations" Value="Underline" />
+		</Style>
+	</Window.Styles>
+
+	<!--Rows: title, tagline, scrollable text, bottom bar. The scrollable text takes all leftover vertical space. In the bottom bar the copyright text gets the full remaining width while the buttons keep their native size on the right.-->
+	<Grid Margin="12" RowDefinitions="Auto,Auto,*,Auto">
+		<TextBlock Text="WHAT SCHEDULE?!" FontSize="16" FontWeight="Bold" Foreground="{x:Static app:ThemeDefinition.AboutHeader}" />
+		<TextBlock Grid.Row="1" Margin="0,12,0,0" Text="A free, cross-platform desktop application for handling stream schedules." TextWrapping="Wrap" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+		<ScrollViewer Grid.Row="2" Margin="0,12,0,12" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+			<StackPanel Spacing="4">
+				<StackPanel Spacing="8">
+					<TextBlock Text="Credits" FontWeight="Bold" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+					<!--One row per credit: an icon, the name as a link (Tag holds the URL) and a line saying what the person did. The icon Image stays hidden until a human-provided PNG is added under Assets/Credits and registered as an AvaloniaResource; then set Source="avares://WhatSchedule/Assets/Credits/<file>.png" and IsVisible="True".-->
+					<!--Auto,* grid: the * column gives the text a finite width (viewport minus icon), so the description wraps instead of overflowing when the window is narrow. A horizontal StackPanel here would measure the text unconstrained and never wrap.-->
+					<Grid ColumnDefinitions="Auto,*">
+						<Image Grid.Column="0" Width="64" Height="64" IsVisible="True" VerticalAlignment="Top" Margin="0,0,8,0" Source="avares://WhatSchedule/Assets/Credits/Sui_VT.png" />
+						<StackPanel Grid.Column="1" Spacing="2">
+							<Button Classes="link" Tag="https://www.twitch.tv/sui_vt" Click="OnCreditLinkClick" HorizontalAlignment="Left"
+									Foreground="{x:Static app:ThemeDefinition.Selection}" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+								<TextBlock Text="Sui_VT" />
+							</Button>
+							<TextBlock Text="Idea, C# programming, cleaning up AI generated code, design of the default template, additional icons." FontSize="12" TextWrapping="Wrap" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+						</StackPanel>
+					</Grid>
+				</StackPanel>
+				<TextBlock Text="Licence" FontWeight="Bold" Margin="0,12,0,0" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+				<TextBlock Text="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version." TextWrapping="Wrap" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+				<TextBlock Text="This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details." TextWrapping="Wrap" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+				<TextBlock Text="You should have received a copy of the GNU General Public License along with this program. The full license text ships as LICENSE.md with the source code; if not, see https://www.gnu.org/licenses/gpl-3.0.html." TextWrapping="Wrap" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+			</StackPanel>
+		</ScrollViewer>
+		<!--ColumnDefinitions belongs on the Grid, not on a StackPanel: * gives the text all leftover width, Auto keeps each button at its native size. VerticalAlignment="Center" stops the buttons from stretching to the row's height.-->
+		<Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto">
+			<StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+				<TextBlock Text="Copyright (C) 2026" VerticalAlignment="Center" Foreground="{x:Static app:ThemeDefinition.RulerLabel}" />
+				<Button Classes="link" Tag="https://github.com/SuiMachine/WHAT-SCHEDULE/" Click="OnCreditLinkClick" VerticalAlignment="Center"
+						Foreground="{x:Static app:ThemeDefinition.Selection}" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+					<TextBlock Text="Sui_VT" />
+				</Button>
+			</StackPanel>
+			<Button Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Content="View full license online" Click="OnViewLicenseClick" />
+			<Button Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" Content="OK" IsDefault="True" IsCancel="True" Click="OnOkClick" />
+		</Grid>
+	</Grid>
+</Window>

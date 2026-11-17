@@ -14,6 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Credits\Sui_VT.png" />
     <None Remove="Assets\Example\active_day_left.png" />
     <None Remove="Assets\Example\active_day_right.png" />
     <None Remove="Assets\Example\art_outline.png" />
@@ -39,9 +40,13 @@
     <Compile Update="Controls\Dialogs\ColorPickerDIalog.axaml.cs">
       <DependentUpon>ColorPickerDialog.axaml</DependentUpon>
     </Compile>
+    <Compile Update="Controls\Dialogs\AboutDialog.axaml.cs">
+      <DependentUpon>AboutDialog.axaml</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\Credits\Sui_VT.png" />
     <AvaloniaResource Include="Assets\Example\active_day_left.png" />
     <AvaloniaResource Include="Assets\Example\active_day_right.png" />
     <AvaloniaResource Include="Assets\Example\art_outline.png" />

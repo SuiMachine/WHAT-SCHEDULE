@@ -114,6 +114,7 @@ public static class ThemeDefinition
 	public static readonly ISolidColorBrush SelectionLocked = new ImmutableSolidColorBrush(0xFFFF0000);
 	public static readonly ISolidColorBrush HandleFill = new ImmutableSolidColorBrush(Colors.White);
 	public static readonly ISolidColorBrush Guide = new ImmutableSolidColorBrush(0xFF00A2ED);
+	public static readonly ISolidColorBrush AboutHeader = new ImmutableSolidColorBrush(0xFF4CC2FF);
 
 	public static readonly IPen RulerBorderPen = new Pen(Border, 1);
 	public static readonly IPen TickPen = new Pen(RulerTick, 1);

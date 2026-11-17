@@ -5,6 +5,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using System.Globalization;
 using WhatSchedule.Controls.Dialogs;
@@ -46,6 +48,12 @@ public sealed class ElementHierarchyView : Control
 
 	/// <summary>The element the row menu was opened for, kept because the menu outlives the rows it was built from.</summary>
 	private CanvasElement? menuElement;
+
+	private static readonly IImage Icon_Visible = new Bitmap(AssetLoader.Open(new Uri("avares://WhatSchedule/Assets/Icons/visible.png")));
+	private static readonly IImage Icon_Hidden = new Bitmap(AssetLoader.Open(new Uri("avares://WhatSchedule/Assets/Icons/hidden.png")));
+	private static readonly IImage Icon_Locked = new Bitmap(AssetLoader.Open(new Uri("avares://WhatSchedule/Assets/Icons/locked.png")));
+	private static readonly IImage Icon_Unlocked = new Bitmap(AssetLoader.Open(new Uri("avares://WhatSchedule/Assets/Icons/unlocked.png")));
+
 
 	/// <summary>The lock item of the row menu, kept so the menu can be re-checked for the element it is opened on.</summary>
 	private readonly MenuItem lockItem;
@@ -114,11 +122,11 @@ public sealed class ElementHierarchyView : Control
 		}
 
 		var lockItem = new MenuItem { Header = "Lock", ToggleType = MenuItemToggleType.CheckBox };
-		lockItem.Click += (_, _) => ToggleLock();
+		lockItem.Click += (_, _) => { if (menuElement is { } element) ToggleLock(element); };
 		this.lockItem = lockItem;
 
 		var hideItem = new MenuItem { Header = "Hide", ToggleType = MenuItemToggleType.CheckBox };
-		hideItem.Click += (_, _) => ToggleHidden();
+		hideItem.Click += (_, _) => { if (menuElement is { } element) ToggleHidden(element); };
 		this.hideItem = hideItem;
 
 		var renameItem = new MenuItem { Header = "Rename..." };
@@ -310,7 +318,12 @@ public sealed class ElementHierarchyView : Control
 						context.DrawGeometry(null, ChevronPen, collapsedGroups.Contains(groupRow) ? CollapsedChevron : ExpandedChevron);
 				}
 
-				DrawName(context, labels[row], new Rect(indent, top, Math.Max(0, bounds.Width - indent - TextPadding), RowHeight));
+				//Right edge of the row, centered vertically like the chevron: the lock slot shows the closed lock for a locked element and the open one otherwise; the rightmost visibility slot shows the eye for a visible element and the crossed-out eye for a hidden one. The name's rect stops short of both.
+				var iconY = top + (RowHeight - ChevronSize) / 2;
+				context.DrawImage(rows[row].Element.IsLocked ? Icon_Locked : Icon_Unlocked, new Rect(bounds.Width - 2 * TextPadding - 2 * ChevronSize, iconY, ChevronSize, ChevronSize));
+				context.DrawImage(rows[row].Element.IsHidden ? Icon_Hidden : Icon_Visible, new Rect(bounds.Width - TextPadding - ChevronSize, iconY, ChevronSize, ChevronSize));
+
+				DrawName(context, labels[row], new Rect(indent, top, Math.Max(0, bounds.Width - indent - 3 * TextPadding - 2 * ChevronSize), RowHeight));
 			}
 
 			if (dragRow >= 0 && dragTarget >= 0)
@@ -415,19 +428,19 @@ public sealed class ElementHierarchyView : Control
 			document.ToggleTagTracked(element, tag);
 	}
 
-	/// <summary>Toggles the menu's element's lock, recorded in the undo history; a locked element refuses to move,
+	/// <summary>Toggles the element's lock, recorded in the undo history; a locked element refuses to move,
 	/// scale or rotate directly on the canvas but still rides along with its group's own transform.</summary>
-	private void ToggleLock()
+	private void ToggleLock(CanvasElement element)
 	{
-		if (menuElement is { } element && canvas?.Document is { } document)
+		if (canvas?.Document is { } document)
 			document.SetLockTracked(element, !element.IsLocked);
 	}
 
-	/// <summary>Toggles the menu's element's visibility, recorded in the undo history; a hidden element stays
-	/// out of the document, not drawn and not picked on the canvas, until it is shown again from this menu.</summary>
-	private void ToggleHidden()
+	/// <summary>Toggles the element's visibility, recorded in the undo history; a hidden element stays
+	/// out of the document, not drawn and not picked on the canvas, until it is shown again.</summary>
+	private void ToggleHidden(CanvasElement element)
 	{
-		if (menuElement is { } element && canvas?.Document is { } document)
+		if (canvas?.Document is { } document)
 			document.SetHiddenTracked(element, !element.IsHidden);
 	}
 
@@ -500,6 +513,22 @@ public sealed class ElementHierarchyView : Control
 		{
 			ToggleCollapse(toggleGroup);
 			e.Handled = true;
+			return;
+		}
+
+		//A click on a row's lock or visibility icon toggles that state on the row's element instead of selecting or dragging the row.
+		if (IsOverIconSlot(point.Position, 1))
+		{
+			ToggleLock(rows[row].Element);
+			e.Handled = true;
+			InvalidateVisual();
+			return;
+		}
+		if (IsOverIconSlot(point.Position, 0))
+		{
+			ToggleHidden(rows[row].Element);
+			e.Handled = true;
+			InvalidateVisual();
 			return;
 		}
 
@@ -782,6 +811,13 @@ public sealed class ElementHierarchyView : Control
 	{
 		var gauge = TextPadding + rows[row].Depth * IndentWidth;
 		return position.X >= gauge && position.X < gauge + IndentWidth;
+	}
+
+	/// <summary>Whether the position is over one of the row's right-edge icon slots: slot 0 is the rightmost (visibility), slot 1 the lock icon left of it. The row itself is found by <see cref="RowAt"/>.</summary>
+	private bool IsOverIconSlot(Point position, int slotFromRight)
+	{
+		var x = Bounds.Width - TextPadding - (slotFromRight + 1) * ChevronSize - slotFromRight * TextPadding;
+		return position.X >= x && position.X < x + ChevronSize;
 	}
 
 	/// <summary>Hides or shows the group's rows, keeping the choice across refreshes until the document changes.</summary>

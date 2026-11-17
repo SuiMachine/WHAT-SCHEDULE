@@ -22,6 +22,10 @@
     <None Remove="Assets\Example\background_outline.png" />
     <None Remove="Assets\Example\element_bg.png" />
     <None Remove="Assets\Example\outline.png" />
+    <None Remove="Assets\Icons\hidden.png" />
+    <None Remove="Assets\Icons\locked.png" />
+    <None Remove="Assets\Icons\unlocked.png" />
+    <None Remove="Assets\Icons\visible.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -55,7 +59,12 @@
     <AvaloniaResource Include="Assets\Example\background_outline.png" />
     <AvaloniaResource Include="Assets\Example\element_bg.png" />
     <AvaloniaResource Include="Assets\Example\outline.png" />
+    <AvaloniaResource Include="Assets\Icons\hidden.png" />
+    <AvaloniaResource Include="Assets\Icons\locked.png" />
+    <AvaloniaResource Include="Assets\Icons\unlocked.png" />
+    <AvaloniaResource Include="Assets\Icons\visible.png" />
   </ItemGroup>
+
 
   <ItemGroup>
     <None Update="Dictionaries\en_GB.aff">

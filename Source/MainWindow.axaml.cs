@@ -38,11 +38,11 @@ public partial class MainWindow : Window
 
 	private async Task ShowLegalNoticeOnFirstRunAsync()
 	{
-		if (FirstRunNotice.WasShown())
+		if (StartupChecks.WasGPLShown())
 			return;
 
 		await AboutDialog.ShowAsync(this);
-		FirstRunNotice.MarkShown();
+		StartupChecks.MarkGPLAsShown();
 	}
 
 	//The window has no system title bar (WindowDecorations="BorderOnly"), so the custom one in MainWindow.axaml moves,

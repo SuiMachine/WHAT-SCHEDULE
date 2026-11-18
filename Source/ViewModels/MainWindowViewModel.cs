@@ -46,7 +46,14 @@ public partial class MainWindowViewModel : ObservableObject
 
 	public MainWindowViewModel()
 	{
-		Document = CreateSampleDocument();
+		var loadPath = StartupChecks.GetLastProjectFile();
+		if (loadPath != "" && File.Exists(loadPath))
+		{
+			using FileStream fs = new(loadPath, FileMode.Open, FileAccess.Read);
+			Document = DocumentSerializer.Load(fs);
+		}
+		else
+			Document = CreateSampleDocument();
 	}
 
 	[RelayCommand]
@@ -120,6 +127,7 @@ public partial class MainWindowViewModel : ObservableObject
 
 		await using var stream = await file.OpenWriteAsync();
 		DocumentSerializer.Save(Document, stream);
+		StartupChecks.SetLastProjectFile(file.Path.AbsolutePath);
 	}
 
 	[RelayCommand]

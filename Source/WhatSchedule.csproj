@@ -67,18 +67,22 @@
 
 
   <ItemGroup>
-    <None Update="Dictionaries\en_GB.aff">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Dictionaries\en_GB.dic">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="Dictionaries\en_US.aff">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Dictionaries\en_US.dic">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Content Remove="C:\Users\suici\.nuget\packages\ghsoftware.avalonia.spellchecker\0.3.3\buildTransitive\Dictionaries\en_GB.aff" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Content Remove="C:\Users\suici\.nuget\packages\ghsoftware.avalonia.spellchecker\0.3.3\buildTransitive\Dictionaries\en_GB.dic" />
   </ItemGroup>
 
 </Project>

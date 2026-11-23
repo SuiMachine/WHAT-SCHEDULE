@@ -3,6 +3,7 @@ bin/
 obj/
 artifacts/
 TestResults/
+Publish/
 
 # IDE
 .vs/

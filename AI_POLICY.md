@@ -9,7 +9,7 @@ By contributing to this repository, you agree to comply with this policy.
 
 All use of AI in this project must be:
 
-- **Moral** — AI must never be used to deceive, mislead, or misattribute.
+- **As moral as possible** — AI must never be used to deceive, mislead, or misattribute.
 - **Transparent** — Contributors must disclose when and how AI was used.
 - **Accountable** — The human contributor is fully responsible for everything they submit, whether written by hand or with AI assistance. "The AI wrote it" is never a valid excuse for defects, license violations.
 
@@ -56,6 +56,13 @@ The following are **strictly prohibited**:
 - Do not use AI to automate commits, reviews, or merges without explicit human involvement and oversight.
 - Readme and documentation has to be written by hand.
 
+### 3.5 Github communication
+- Entire Github communication **has to be written by hand** (AI may be used to correct sentences), this includes:
+  - Wiki pages (with all of the assets that may be used)
+  - Discussion pages
+  - Issues pages
+- If AI usage is suspected, threads might be closed by maintainer without an explanation and accounts blocked.
+
 ---
 
 ## 4. Third-Party Code and Licensing
@@ -95,6 +102,7 @@ If you notice a contribution that appears to violate this policy, raise it with 
 | AI rewriting third-party code to avoid credit | **Prohibited.** Always moral and transparent. |
 | Third-party code use | Credit the source, respect its license. |
 | General AI use in code | Permitted with disclosure, understanding, and accountability. |
+| Wiki, Issues and Discussion pages |  **Prohibited.** Communication must be done entirely by humans. |
 
 ---
 

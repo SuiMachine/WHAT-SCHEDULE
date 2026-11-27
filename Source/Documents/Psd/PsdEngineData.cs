@@ -4,6 +4,8 @@
 using System.Globalization;
 using System.Text;
 
+using SkiaSharp;
+
 namespace WhatSchedule.Documents;
 
 /// <summary>
@@ -65,13 +67,47 @@ internal static class PsdEngineData
 		}
 	}
 
-	/// <summary>The PostScript name of the font at <paramref name="index"/> in the engine data's font set, clamped into it; the set sits in the root's resource or document dictionary.</summary>
+	/// <summary>The font at <paramref name="index"/> in the engine data's font set, clamped into it and mapped onto an installed font family when one matches; the set sits in the root's resource or document dictionary.</summary>
 	private static string? FontName(Dictionary<string, object?> root, int index)
 	{
 		var set = Raw(Member(root, "ResourceDict"), "FontSet") ?? Raw(Member(root, "DocumentResources"), "FontSet") ?? Raw(root, "FontSet");
-		if (set is List<object?> fonts && fonts.Count > 0)
-			return String(fonts[Math.Clamp(index, 0, fonts.Count - 1)] as Dictionary<string, object?>, "Name");
-		return null;
+		if (set is not List<object?> fonts || fonts.Count == 0)
+			return null;
+		return ResolveSystemFont(String(fonts[Math.Clamp(index, 0, fonts.Count - 1)] as Dictionary<string, object?>, "Name"));
+	}
+
+	private static string[]? fontFamilies;
+
+	/// <summary>The font families installed on the machine, enumerated once.</summary>
+	private static string[] FontFamilies => fontFamilies ??= SKFontManager.Default.GetFontFamilies();
+
+	/// <summary>
+	/// Maps a font name from the file onto an installed font family: the name itself when a family carries it exactly, else the
+	/// family whose whitespace-free name equals the stored name's, else the stored name unchanged. PostScript names drop
+	/// whitespace, so "SadanaSquare" comes back as the installed "Sadana Square".
+	/// </summary>
+	private static string? ResolveSystemFont(string? name)
+	{
+		if (string.IsNullOrEmpty(name))
+			return name;
+		var families = FontFamilies;
+		if (Array.IndexOf(families, name) >= 0)
+			return name;
+		var stripped = WithoutWhitespace(name);
+		foreach (var family in families)
+			if (WithoutWhitespace(family) == stripped)
+				return family;
+		return name;
+	}
+
+	/// <summary>The name with its whitespace characters removed.</summary>
+	private static string WithoutWhitespace(string value)
+	{
+		var builder = new StringBuilder(value.Length);
+		foreach (var c in value)
+			if (!char.IsWhiteSpace(c))
+				builder.Append(c);
+		return builder.ToString();
 	}
 
 	/// <summary>A color channel given as a fraction of 1, as a byte.</summary>

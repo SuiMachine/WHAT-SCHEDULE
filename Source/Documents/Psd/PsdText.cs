@@ -5,9 +5,9 @@ namespace WhatSchedule.Documents;
 
 /// <summary>
 /// A text layer's character style, taken from the first style run of its engine data:
-/// the PostScript name of the run's font, its size in points (pixels at the document's 72 ppi), faux bold and italic,
-/// the fill color with its alpha, letter spacing in thousandths of an em, horizontal stretch as a fraction of the
-/// natural width, and the line spacing in points when auto leading is off.
+/// the run's font name mapped onto an installed font family when one matches, its size in points (pixels at the document's 72 ppi),
+/// faux bold and italic, the fill color with its alpha, letter spacing in thousandths of an em, horizontal stretch as a fraction
+/// of the natural width, and the line spacing in points when auto leading is off.
 /// </summary>
 public sealed record PsdTextStyle(string? FontName, float? FontSize, bool Bold, bool Italic, PsdColor? FillColor, byte FillAlpha, float? Tracking, float? HorizontalScale, float? Leading, bool AutoLeading);
 

@@ -36,14 +36,20 @@ internal static class PsdEngineData
 				Member(styleSheet, "StyleSheetData") is { } sheet)
 			{
 				PsdColor? fillColor = null;
-				var fillAlpha = (byte)255;
+				byte fillAlpha = 255;
 				if (Member(sheet, "FillColor") is { } color &&
-					color.TryGetValue("Values", out var values) && values is List<object?> list && list.Count >= 3 &&
-					list[0] is double red && list[1] is double green && list[2] is double blue)
+					color.TryGetValue("Values", out var values) && values is List<object?> list && list.Count >= 3)
 				{
-					fillColor = new PsdColor(ToByte(red), ToByte(green), ToByte(blue));
-					if (list.Count >= 4 && list[3] is double alpha)
-						fillAlpha = ToByte(alpha);
+					if (list.Count == 4)
+					{
+						fillColor = new PsdColor(ToByte((double)list[1]!), ToByte((double)list[2]!), ToByte((double)list[3]!));
+						fillAlpha = ToByte((double)list[0]!);
+					}
+					else
+					{
+						fillColor = new PsdColor(ToByte((double)list[1]!), ToByte((double)list[2]!), ToByte((double)list[3]!));
+						fillAlpha = 255;
+					}
 				}
 
 				style = new PsdTextStyle(

@@ -15,6 +15,6 @@ public sealed record PsdTextStyle(string? FontName, float? FontSize, bool Bold, 
 /// A text layer's content and placement, read from its type tool data ('TySh'/'tySh'):
 /// the text with carriage returns for line breaks, the text box's bounds on the canvas (empty for point text),
 /// whether the text runs vertically, the paragraph justification as Photoshop numbers it (0 left, 1 right, 2 center),
-/// and the first style run.
+/// the first style run, and the text's rotation in degrees from its affine transform, clockwise-positive on screen.
 /// </summary>
-public sealed record PsdText(string Text, PsdRect Box, bool Vertical, int Justification, PsdTextStyle? Style);
+public sealed record PsdText(string Text, PsdRect Box, bool Vertical, int Justification, PsdTextStyle? Style, double Rotation);

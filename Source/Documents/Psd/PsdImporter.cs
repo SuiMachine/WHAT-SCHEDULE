@@ -237,6 +237,8 @@ public static class PsdImporter
 		else
 			label.Position = new SKPoint(layer.Rect.Left, layer.Rect.Top);
 
+		label.Rotation = (float)text.Rotation;
+
 		if (text.Style is { } style)
 		{
 			if (style.FontName is { Length: > 0 } fontName)

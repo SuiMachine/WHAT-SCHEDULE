@@ -13,8 +13,9 @@ public sealed record PsdTextStyle(string? FontName, float? FontSize, bool Bold, 
 
 /// <summary>
 /// A text layer's content and placement, read from its type tool data ('TySh'/'tySh'):
-/// the text with carriage returns for line breaks, the text box's bounds on the canvas (empty for point text),
-/// whether the text runs vertically, the paragraph justification as Photoshop numbers it (0 left, 1 right, 2 center),
-/// the first style run, and the text's rotation in degrees from its affine transform, clockwise-positive on screen.
+/// the text with carriage returns for line breaks, the text box's bounds in the text's local coordinates (empty for
+/// point text), whether the text runs vertically, the paragraph justification as Photoshop numbers it (0 left, 1 right,
+/// 2 center), the first style run, and the affine transform's rotation in degrees (clockwise-positive on screen) and
+/// its translation, the text's original anchor point, which goes stale when the layer is moved.
 /// </summary>
-public sealed record PsdText(string Text, PsdRect Box, bool Vertical, int Justification, PsdTextStyle? Style, double Rotation);
+public sealed record PsdText(string Text, PsdRect Box, bool Vertical, int Justification, PsdTextStyle? Style, double Rotation, double AnchorX, double AnchorY);

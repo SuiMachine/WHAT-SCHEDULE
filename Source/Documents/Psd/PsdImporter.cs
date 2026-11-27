@@ -227,15 +227,16 @@ public static class PsdImporter
 		if (layer.Name.Length > 0)
 			label.Name = layer.Name;
 
-		//A text box from the file becomes the label's box; point text's empty box sizes the label to its text, at the layer's bounds.
-		if (text.Box is { Width: > 0, Height: > 0 } box)
+		//A text box from the file becomes the label's box. The transform's anchor is not used for position: it keeps
+		//the original click point and goes stale when the layer is moved, while the record's bounds are where the
+		//layer's pixels sit. Point text's empty box is positioned below, once its font is known.
+		var pointText = text.Box is not { Width: > 0, Height: > 0 };
+		if (!pointText)
 		{
-			label.Position = new SKPoint(box.Left, box.Top);
-			label.Width = box.Width;
-			label.Height = box.Height;
+			label.Position = new SKPoint(text.Box.Left, text.Box.Top);
+			label.Width = text.Box.Width;
+			label.Height = text.Box.Height;
 		}
-		else
-			label.Position = new SKPoint(layer.Rect.Left, layer.Rect.Top);
 
 		label.Rotation = (float)text.Rotation;
 
@@ -275,7 +276,43 @@ public static class PsdImporter
 			else if (style.Leading is { } leading && label.FontSize > 0)
 				label.LineHeight = Math.Clamp(leading / label.FontSize, 0.5f, 3f);
 		}
+		//Point text sizes the label to its text. Unrotated, the layer bounds are the glyphs' ink box while the label's
+		//position is the line box's top-left, so shift by the font's own ink bounds to land the glyphs on the bounds.
+		//Rotated, the bounds are the bbox of the rotated ink box, whose center is the rotated box's center, and the
+		//label rotates around its own center, so center the label on the bounds instead.
+		if (pointText)
+		{
+			if (Math.Abs(text.Rotation) > 0.01)
+			{
+				var size = label.Size;
+				label.Position = new SKPoint(
+					(layer.Rect.Left + layer.Rect.Right - size.Width) / 2f,
+					(layer.Rect.Top + layer.Rect.Bottom - size.Height) / 2f);
+			}
+			else
+				label.Position = new SKPoint(layer.Rect.Left, layer.Rect.Top) + InkOffset(label);
+		}
+
 		return label;
+	}
+
+	/// <summary>The offset from a point text layer's bounds to the label position that puts the glyphs' ink box on them, measured with the label's own font.</summary>
+	private static SKPoint InkOffset(LabelElement label)
+	{
+		if (label.Text.Length == 0)
+			return new SKPoint(0, 0);
+		var typeface = SKTypeface.FromFamilyName(label.FontFamily, label.FontStyle);
+		using var font = new SKFont(typeface ?? SKTypeface.Default, label.FontSize);
+		typeface?.Dispose();
+		var left = float.MaxValue;
+		var top = float.MaxValue;
+		foreach (var line in label.Text.Replace("\r\n", "\n").Split('\n'))
+		{
+			font.MeasureText(line, out var bounds);
+			left = Math.Min(left, bounds.Left);
+			top = Math.Min(top, bounds.Top);
+		}
+		return new SKPoint(-left, font.Metrics.Ascent - top);
 	}
 
 	/// <summary>Builds the image element for a pixel layer, with its bounds, opacity, blend mode and name; returns null for empty layers.</summary>

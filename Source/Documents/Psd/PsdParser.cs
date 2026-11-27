@@ -244,15 +244,18 @@ public static class PsdParser
 
 	/// <summary>
 	/// Reads a text layer's type tool data ('TySh' or 'tySh'), as the format stores it: a version, the text's affine
-	/// transform (of which only the rotation is kept), then the text descriptor whose 'EngineData' member carries the
-	/// style, then the warp descriptor and the text box's bounds. The layer record's own bounds carry the position.
+	/// transform (of which the rotation and anchor are kept), then the text descriptor whose 'EngineData' member carries
+	/// the style, then the warp descriptor and the text box's bounds in the text's local coordinates. The layer record's
+	/// own bounds carry the rendered pixels' extent.
 	/// </summary>
 	private static PsdText ReadTypeTool(PsdReader reader)
 	{
 		reader.UInt16(); //Version.
-		var xx = reader.Float64(); //The text's affine transform, xx, xy, yx, yy, tx, ty; only its rotation is kept.
+		var xx = reader.Float64(); //The text's affine transform, xx, xy, yx, yy, tx, ty.
 		var xy = reader.Float64();
-		reader.Skip(32);
+		reader.Skip(16);
+		var tx = reader.Float64();
+		var ty = reader.Float64();
 		var rotation = Math.Atan2(xy, xx) * 180 / Math.PI; //Photoshop's angle is atan2(xy, xx), clockwise-positive on screen.
 		reader.UInt16(); //The text data's version.
 		reader.UInt32(); //The text descriptor's version.
@@ -269,7 +272,7 @@ public static class PsdParser
 			: (0, null, null);
 		if (text.Length == 0 && engineText is { Length: > 0 } fallback)
 			text = fallback;
-		return new PsdText(text, box, vertical, justification, style, rotation);
+		return new PsdText(text, box, vertical, justification, style, rotation, tx, ty);
 	}
 
 	/// <summary>A big-endian reader over a Photoshop file's bytes, throwing <see cref="InvalidDataException"/> past the end of the file; a class, so its read position advances for everyone it is passed to.</summary>

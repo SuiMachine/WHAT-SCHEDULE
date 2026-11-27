@@ -18,6 +18,8 @@ The core of this project was written with help of GLM 5.3 and Mistral Large 4. I
 - Import of your stream schedule for the week from Twitch.
 - Export of your weekly schedule to PNG.
 
+![Custom.png](/Examples/Custom.png)
+
 ## Prerequisites
 
 - [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)

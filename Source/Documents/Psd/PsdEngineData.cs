@@ -47,7 +47,7 @@ internal static class PsdEngineData
 					}
 					else
 					{
-						fillColor = new PsdColor(ToByte((double)list[1]!), ToByte((double)list[2]!), ToByte((double)list[3]!));
+						fillColor = new PsdColor(ToByte((double)list[0]!), ToByte((double)list[1]!), ToByte((double)list[2]!));
 						fillAlpha = 255;
 					}
 				}

@@ -4,13 +4,14 @@
 using System.Runtime.InteropServices;
 using SkiaSharp;
 using WhatSchedule.Elements;
+using WhatSchedule.Rendering.Definitions;
 
 namespace WhatSchedule.Documents;
 
 /// <summary>What a Photoshop import produces: the file's layers as elements and the document background the file's size comes from.</summary>
 public sealed record PsdImportResult(List<CanvasElement> Elements, SKBitmap Background);
 
-/// <summary>Turns the layers of a Photoshop (PSD) file into canvas elements, the way the importer supports them: pixel layers become image elements, groups become group elements, hidden layers and layers without pixels are skipped, and layer masks arrive already baked into the alpha channel.</summary>
+/// <summary>Turns the layers of a Photoshop (PSD) file into canvas elements, the way the importer supports them: text layers become label elements, pixel layers become image elements, groups become group elements, hidden layers and layers without pixels are skipped, and layer masks arrive already baked into the alpha channel.</summary>
 public static class PsdImporter
 {
 	/// <summary>Photoshop blend keys mapped onto the blend modes the inspector offers; every other key imports as normal blending.</summary>
@@ -180,8 +181,142 @@ public static class PsdImporter
 		["lum "] = SKBlendMode.Luminosity,
 	};
 
+	/// <summary>Builds the element for a layer: a text layer becomes a label, a pixel layer an image element; returns null for layers without anything to show.</summary>
+	private static CanvasElement? CreateElement(PsdLayer layer)
+	{
+		//Vertical text has no label counterpart, so it stays a rasterized image.
+		if (layer.Text is { } text && !text.Vertical)
+			return CreateLabel(layer, text);
+		return CreateImage(layer);
+	}
+
+	/// <summary>PostScript font name suffixes mapped onto the style cuts the inspector offers; a name without a known suffix keeps its whole name and the normal cut.</summary>
+	private static readonly (string Suffix, SKFontStyle Style)[] FontNameCuts =
+	{
+		("-BoldItalic", SKFontStyle.BoldItalic),
+		("-BoldOblique", SKFontStyle.BoldItalic),
+		("-Bold", SKFontStyle.Bold),
+		("-Italic", SKFontStyle.Italic),
+		("-Oblique", SKFontStyle.Italic),
+		("-Regular", SKFontStyle.Normal),
+	};
+
+	/// <summary>Splits a PostScript font name like "MyriadPro-BoldItalic" into the family name and the style cut.</summary>
+	private static (string Family, SKFontStyle Cut) SplitFontName(string name)
+	{
+		foreach (var (suffix, cut) in FontNameCuts)
+		{
+			if (name.EndsWith(suffix, StringComparison.Ordinal))
+				return (name[..^suffix.Length], cut);
+		}
+		return (name, SKFontStyle.Normal);
+	}
+
+	/// <summary>
+	/// Builds the label element for a text layer: the file's text, font, size, color, alignment and text box mapped onto
+	/// the label's features, at the layer's canvas position, with its opacity, blend mode and name.
+	/// </summary>
+	private static LabelElement CreateLabel(PsdLayer layer, PsdText text)
+	{
+		var label = new LabelElement
+		{
+			Text = text.Text.Replace('\r', '\n'),
+			Opacity = layer.Opacity / 255f,
+			BlendMode = BlendKeys.GetValueOrDefault(layer.BlendKey, SKBlendMode.SrcOver),
+		};
+		if (layer.Name.Length > 0)
+			label.Name = layer.Name;
+
+		//A text box from the file becomes the label's box. The transform's anchor is not used for position: it keeps
+		//the original click point and goes stale when the layer is moved, while the record's bounds are where the
+		//layer's pixels sit. Point text's empty box is positioned below, once its font is known.
+		var pointText = text.Box is not { Width: > 0, Height: > 0 };
+		if (!pointText)
+		{
+			label.Position = new SKPoint(text.Box.Left, text.Box.Top);
+			label.Width = text.Box.Width;
+			label.Height = text.Box.Height;
+		}
+
+		label.Rotation = (float)text.Rotation;
+
+		if (text.Style is { } style)
+		{
+			if (style.FontName is { Length: > 0 } fontName)
+			{
+				var (family, cut) = SplitFontName(fontName);
+				label.FontFamily = family;
+				var bold = cut == SKFontStyle.Bold || cut == SKFontStyle.BoldItalic || style.Bold;
+				var italic = cut == SKFontStyle.Italic || cut == SKFontStyle.BoldItalic || style.Italic;
+				label.FontStyle = (bold, italic) switch
+				{
+					(true, true) => SKFontStyle.BoldItalic,
+					(true, false) => SKFontStyle.Bold,
+					(false, true) => SKFontStyle.Italic,
+					_ => SKFontStyle.Normal,
+				};
+			}
+			if (style.FontSize is { } fontSize && fontSize > 0)
+				label.FontSize = Math.Max(ThemeDefinition.MinFontSize, fontSize);
+			if (style.FillColor is { } fill)
+				label.TextColor = new SKColor(fill.R, fill.G, fill.B, style.FillAlpha);
+			//Photoshop numbers the justification 0 left, 1 right, 2 center; the justify-all variants import as left.
+			label.Alignment = text.Justification switch
+			{
+				1 => TextAlignment.Right,
+				2 or 5 => TextAlignment.Center,
+				_ => TextAlignment.Left,
+			};
+			if (style.Tracking is { } tracking) //Tracking is in thousandths of an em.
+				label.LetterSpacing = Math.Max(0f, tracking / 1000f * label.FontSize);
+			if (style.HorizontalScale is { } scale)
+				label.Stretch = Math.Clamp(scale * 100f, 50f, 200f);
+			if (style.AutoLeading)
+				label.LineHeight = 1.2f; //Photoshop's automatic leading.
+			else if (style.Leading is { } leading && label.FontSize > 0)
+				label.LineHeight = Math.Clamp(leading / label.FontSize, 0.5f, 3f);
+		}
+		//Point text sizes the label to its text. Unrotated, the layer bounds are the glyphs' ink box while the label's
+		//position is the line box's top-left, so shift by the font's own ink bounds to land the glyphs on the bounds.
+		//Rotated, the bounds are the bbox of the rotated ink box, whose center is the rotated box's center, and the
+		//label rotates around its own center, so center the label on the bounds instead.
+		if (pointText)
+		{
+			if (Math.Abs(text.Rotation) > 0.01)
+			{
+				var size = label.Size;
+				label.Position = new SKPoint(
+					(layer.Rect.Left + layer.Rect.Right - size.Width) / 2f,
+					(layer.Rect.Top + layer.Rect.Bottom - size.Height) / 2f);
+			}
+			else
+				label.Position = new SKPoint(layer.Rect.Left, layer.Rect.Top) + InkOffset(label);
+		}
+
+		return label;
+	}
+
+	/// <summary>The offset from a point text layer's bounds to the label position that puts the glyphs' ink box on them, measured with the label's own font.</summary>
+	private static SKPoint InkOffset(LabelElement label)
+	{
+		if (label.Text.Length == 0)
+			return new SKPoint(0, 0);
+		var typeface = SKTypeface.FromFamilyName(label.FontFamily, label.FontStyle);
+		using var font = new SKFont(typeface ?? SKTypeface.Default, label.FontSize);
+		typeface?.Dispose();
+		var left = float.MaxValue;
+		var top = float.MaxValue;
+		foreach (var line in label.Text.Replace("\r\n", "\n").Split('\n'))
+		{
+			font.MeasureText(line, out var bounds);
+			left = Math.Min(left, bounds.Left);
+			top = Math.Min(top, bounds.Top);
+		}
+		return new SKPoint(-left, font.Metrics.Ascent - top);
+	}
+
 	/// <summary>Builds the image element for a pixel layer, with its bounds, opacity, blend mode and name; returns null for empty layers.</summary>
-	private static ImageElement? CreateElement(PsdLayer layer)
+	private static ImageElement? CreateImage(PsdLayer layer)
 	{
 		var width = layer.Rect.Width;
 		var height = layer.Rect.Height;

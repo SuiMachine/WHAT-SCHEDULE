@@ -215,6 +215,8 @@ public partial class MainWindowViewModel : ObservableObject
 		foreach (var (suffix, zone) in defaultConversions)
 			document.Week.Conversions.Add(new ScheduleZoneConversion { Suffix = suffix, TimeZoneId = zone });
 
+		document.Variables.Add("Offline_Text", "Offline");
+
 		document.Add(new ImageElement(LoadExampleInternalAsset("background_outline.png"), new SKPoint() { X = 0, Y = 0 })
 		{
 			Name = "Background outline",
@@ -374,7 +376,21 @@ public partial class MainWindowViewModel : ObservableObject
 				Alignment = Rendering.Definitions.TextAlignment.Center,
 				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
 				FontFamily = "Impact",
-				FontSize = 38
+				FontSize = 38,
+				Tag = new ScheduleTag(dayOfTheWeek, ScheduleActivity.Streaming)
+			}, 2);
+
+			dayGroup.InsertChild(new LabelElement()
+			{
+				Text = $"{{Offline_Text}}",
+				Position = new SKPoint(-412, -54),
+				Width = 826,
+				Height = 112,
+				Alignment = Rendering.Definitions.TextAlignment.Center,
+				VerticalPlacement = Rendering.Definitions.TextVerticalPlacement.Middle,
+				FontFamily = "Impact",
+				FontSize = 38,
+				Tag = new ScheduleTag(dayOfTheWeek, ScheduleActivity.TakingABreak)
 			}, 2);
 
 			int dayOfWeekPosition = counter % 2 == 0 ? startPositionX : startPositionX + shuffleX;

@@ -35,8 +35,8 @@ public readonly record struct PsdColor(byte R, byte G, byte B);
 /// <summary>A layer's color overlay style: the color painted over the layer, its opacity in 255ths, and its Photoshop blend key.</summary>
 public sealed record PsdOverlay(PsdColor Color, byte Opacity, string BlendKey);
 
-/// <summary>A single layer read from a Photoshop file; <see cref="Rgba"/> is null for group boundary records and layers without pixels or a fill color, e.g. adjustment layers.</summary>
-public sealed record PsdLayer(PsdRect Rect, string Name, byte Opacity, string BlendKey, bool Hidden, PsdDivider Divider, byte[]? Rgba, PsdColor? Fill, PsdOverlay? Overlay);
+/// <summary>A single layer read from a Photoshop file; <see cref="Rgba"/> is null for group boundary records and layers without pixels or a fill color, e.g. adjustment layers, and <see cref="Text"/> is set for text layers.</summary>
+public sealed record PsdLayer(PsdRect Rect, string Name, byte Opacity, string BlendKey, bool Hidden, PsdDivider Divider, byte[]? Rgba, PsdColor? Fill, PsdOverlay? Overlay, PsdText? Text);
 
 /// <summary>The layers of a Photoshop file.</summary>
 public sealed record PsdDocument(int Width, int Height, IReadOnlyList<PsdLayer> Layers);
@@ -130,7 +130,8 @@ public static class PsdParser
 
 	/// <summary>
 	/// Reads a descriptor, the format's generic key/type/value structure: a class, an item count, then members. Only the types
-	/// the fill color and the color overlay need are understood; objects and lists recurse, scalars convert to plain .NET values.
+	/// the fill color, the color overlay and the type tool data need are understood; objects and lists recurse, scalars convert
+	/// to plain .NET values, and raw data ('alis'/'tdta', e.g. the engine data) comes back as its bytes.
 	/// </summary>
 	private static Dictionary<string, object?> ReadDescriptor(PsdReader reader)
 	{
@@ -177,8 +178,7 @@ public static class PsdParser
 			case "bool": //Boolean.
 				return reader.UInt8() != 0;
 			case "alis" or "tdta": //Alias and raw data: a byte count followed by the bytes.
-				reader.Skip(reader.Int32());
-				return null;
+				return reader.Bytes(reader.Int32()).ToArray();
 			case "type" or "GlbC": //Class.
 				reader.UnicodeString();
 				reader.Key();
@@ -240,6 +240,39 @@ public static class PsdParser
 
 		var blendKey = effect.TryGetValue("Md  ", out var mode) && mode is string key ? key : "norm";
 		return new PsdOverlay(color.Value, (byte)opacity, blendKey);
+	}
+
+	/// <summary>
+	/// Reads a text layer's type tool data ('TySh' or 'tySh'), as the format stores it: a version, the text's affine
+	/// transform (of which the rotation and anchor are kept), then the text descriptor whose 'EngineData' member carries
+	/// the style, then the warp descriptor and the text box's bounds in the text's local coordinates. The layer record's
+	/// own bounds carry the rendered pixels' extent.
+	/// </summary>
+	private static PsdText ReadTypeTool(PsdReader reader)
+	{
+		reader.UInt16(); //Version.
+		var xx = reader.Float64(); //The text's affine transform, xx, xy, yx, yy, tx, ty.
+		var xy = reader.Float64();
+		reader.Skip(16);
+		var tx = reader.Float64();
+		var ty = reader.Float64();
+		var rotation = Math.Atan2(xy, xx) * 180 / Math.PI; //Photoshop's angle is atan2(xy, xx), clockwise-positive on screen.
+		reader.UInt16(); //The text data's version.
+		reader.UInt32(); //The text descriptor's version.
+		var descriptor = ReadDescriptor(reader);
+		reader.UInt16(); //The warp data's version.
+		reader.UInt32(); //The warp descriptor's version.
+		ReadDescriptor(reader); //The warp, which the importer does not reproduce.
+		var box = new PsdRect(reader.Int32(), reader.Int32(), reader.Int32(), reader.Int32());
+
+		var text = descriptor.TryGetValue("Txt ", out var content) && content is string value ? value : string.Empty;
+		var vertical = descriptor.TryGetValue("Ornt", out var orientation) && orientation is string o && o == "Vrtc";
+		var (justification, style, engineText) = descriptor.TryGetValue("EngineData", out var engine) && engine is byte[] raw
+			? PsdEngineData.Parse(raw)
+			: (0, null, null);
+		if (text.Length == 0 && engineText is { Length: > 0 } fallback)
+			text = fallback;
+		return new PsdText(text, box, vertical, justification, style, rotation, tx, ty);
 	}
 
 	/// <summary>A big-endian reader over a Photoshop file's bytes, throwing <see cref="InvalidDataException"/> past the end of the file; a class, so its read position advances for everyone it is passed to.</summary>
@@ -402,6 +435,9 @@ public static class PsdParser
 		/// <summary>The layer's color overlay style ('SoFi' inside 'lfx2' or 'lmfx'), when it has one.</summary>
 		public PsdOverlay? Overlay { get; private set; }
 
+		/// <summary>The layer's text content and style ('TySh' or 'tySh'), when it is a text layer.</summary>
+		public PsdText? Text { get; private set; }
+
 		/// <summary>Whether the layer's shape comes from vector paths ('vmsk' or 'vsms'), which the importer cannot reproduce, so the layer stays skipped even with a fill color.</summary>
 		public bool HasVectorMask { get; private set; }
 
@@ -500,6 +536,9 @@ public static class PsdParser
 					case "lfx2" or "lmfx":
 						TryRead(reader, () => Overlay = ReadColorOverlay(reader));
 						break;
+					case "TySh" or "tySh":
+						TryRead(reader, () => Text = ReadTypeTool(reader));
+						break;
 					case "vmsk" or "vsms":
 						HasVectorMask = true;
 						break;
@@ -564,7 +603,7 @@ public static class PsdParser
 		/// <summary>Builds the layer, composing its planar channels into straight RGBA pixels with the mask multiplied into the alpha.</summary>
 		public PsdLayer ToLayer(uint colorMode, Dictionary<int, byte[]> channels)
 		{
-			return new PsdLayer(Rect, Name, Opacity, BlendKey, Hidden, Divider, ComposePixels(colorMode, channels), Fill, Overlay);
+			return new PsdLayer(Rect, Name, Opacity, BlendKey, Hidden, Divider, ComposePixels(colorMode, channels), Fill, Overlay, Text);
 		}
 
 		/// <summary>Interleaves the layer's color and alpha channels; a present and enabled mask scales every pixel's alpha, and a fill layer's color stands in for missing pixels.</summary>
